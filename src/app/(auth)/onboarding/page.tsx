@@ -22,8 +22,9 @@ export default function OnboardingPage() {
         body: JSON.stringify({ role }),
       });
       if (!res.ok) throw new Error("Failed to set role");
-      await user?.reload();
-      router.push("/influencer/dashboard");
+      // Fire-and-forget session refresh, then hard-navigate so middleware sees fresh session
+      user?.reload().catch(() => {});
+      window.location.href = "/influencer/dashboard";
     } catch {
       toast.error("Something went wrong. Please try again.");
       setLoading(null);

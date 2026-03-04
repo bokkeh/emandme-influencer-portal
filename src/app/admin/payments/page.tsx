@@ -1,11 +1,11 @@
 import { db } from "@/lib/db";
 import { payments, influencerProfiles, users } from "@/lib/db/schema";
-import { eq, sum, and } from "drizzle-orm";
+import { eq, sum } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { KPICard } from "@/components/admin/KPICard";
-import { Button } from "@/components/ui/button";
-import { DollarSign, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
+import { CreatePaymentDialog } from "@/components/admin/CreatePaymentDialog";
+import { CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 
 export default async function PaymentsPage() {
-  const [allPayments, [pendingTotal], [paidTotal], [failedTotal]] = await Promise.all([
+  const [allPayments, [pendingTotal], [paidTotal], [failedTotal], allInfluencers] = await Promise.all([
     db
       .select({
         id: payments.id,
@@ -43,10 +43,29 @@ export default async function PaymentsPage() {
     db.select({ total: sum(payments.amount) }).from(payments).where(eq(payments.status, "pending")),
     db.select({ total: sum(payments.amount) }).from(payments).where(eq(payments.status, "paid")),
     db.select({ total: sum(payments.amount) }).from(payments).where(eq(payments.status, "failed")),
+    db
+      .select({
+        id: influencerProfiles.id,
+        displayName: influencerProfiles.displayName,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(influencerProfiles)
+      .innerJoin(users, eq(influencerProfiles.userId, users.id))
+      .orderBy(influencerProfiles.joinedAt),
   ]);
 
   const fmt = (v: string | null) =>
     v ? `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "$0.00";
+
+  const influencerOptions = allInfluencers.map((inf) => ({
+    id: inf.id,
+    name:
+      (inf.displayName ??
+        `${inf.userFirstName ?? ""} ${inf.userLastName ?? ""}`.trim()) ||
+      inf.userEmail,
+  }));
 
   return (
     <div className="space-y-6">
@@ -55,10 +74,7 @@ export default async function PaymentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
           <p className="text-sm text-gray-500">Manage influencer payouts via Stripe</p>
         </div>
-        <Button className="bg-rose-600 hover:bg-rose-700 gap-2">
-          <DollarSign className="h-4 w-4" />
-          Create Payment
-        </Button>
+        <CreatePaymentDialog influencers={influencerOptions} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -117,9 +133,12 @@ export default async function PaymentsPage() {
                       <TableCell>
                         {p.status === "pending" && p.stripePayoutsEnabled && (
                           <form action={`/api/payments/${p.id}/trigger`} method="POST">
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-xs">
+                            <button
+                              type="submit"
+                              className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                            >
                               Send Payout
-                            </Button>
+                            </button>
                           </form>
                         )}
                         {p.stripeTransferId && (

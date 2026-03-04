@@ -2,11 +2,11 @@ import { db } from "@/lib/db";
 import { discountCodes, influencerProfiles, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { CopyButton } from "@/components/shared/CopyButton";
-import { Tag, Plus } from "lucide-react";
+import { Tag } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { GenerateDiscountCodeDialog } from "@/components/admin/GenerateDiscountCodeDialog";
 import { format } from "date-fns";
 import {
   Table,
@@ -19,28 +19,49 @@ import {
 import Link from "next/link";
 
 export default async function DiscountCodesPage() {
-  const allCodes = await db
-    .select({
-      id: discountCodes.id,
-      code: discountCodes.code,
-      discountType: discountCodes.discountType,
-      discountValue: discountCodes.discountValue,
-      usageCount: discountCodes.usageCount,
-      usageLimit: discountCodes.usageLimit,
-      revenueGenerated: discountCodes.revenueGenerated,
-      isActive: discountCodes.isActive,
-      expiresAt: discountCodes.expiresAt,
-      createdAt: discountCodes.createdAt,
-      influencerId: influencerProfiles.id,
-      influencerName: influencerProfiles.displayName,
-      userEmail: users.email,
-      userFirstName: users.firstName,
-      userLastName: users.lastName,
-    })
-    .from(discountCodes)
-    .innerJoin(influencerProfiles, eq(discountCodes.influencerProfileId, influencerProfiles.id))
-    .innerJoin(users, eq(influencerProfiles.userId, users.id))
-    .orderBy(discountCodes.createdAt);
+  const [allCodes, allInfluencers] = await Promise.all([
+    db
+      .select({
+        id: discountCodes.id,
+        code: discountCodes.code,
+        discountType: discountCodes.discountType,
+        discountValue: discountCodes.discountValue,
+        usageCount: discountCodes.usageCount,
+        usageLimit: discountCodes.usageLimit,
+        revenueGenerated: discountCodes.revenueGenerated,
+        isActive: discountCodes.isActive,
+        expiresAt: discountCodes.expiresAt,
+        createdAt: discountCodes.createdAt,
+        influencerId: influencerProfiles.id,
+        influencerName: influencerProfiles.displayName,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(discountCodes)
+      .innerJoin(influencerProfiles, eq(discountCodes.influencerProfileId, influencerProfiles.id))
+      .innerJoin(users, eq(influencerProfiles.userId, users.id))
+      .orderBy(discountCodes.createdAt),
+    db
+      .select({
+        id: influencerProfiles.id,
+        displayName: influencerProfiles.displayName,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(influencerProfiles)
+      .innerJoin(users, eq(influencerProfiles.userId, users.id))
+      .orderBy(influencerProfiles.joinedAt),
+  ]);
+
+  const influencerOptions = allInfluencers.map((inf) => ({
+    id: inf.id,
+    name:
+      (inf.displayName ??
+        `${inf.userFirstName ?? ""} ${inf.userLastName ?? ""}`.trim()) ||
+      inf.userEmail,
+  }));
 
   return (
     <div className="space-y-6">
@@ -49,10 +70,7 @@ export default async function DiscountCodesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Discount Codes</h1>
           <p className="text-sm text-gray-500">Manage Shopify discount codes for influencers</p>
         </div>
-        <Button className="bg-rose-600 hover:bg-rose-700 gap-2">
-          <Plus className="h-4 w-4" />
-          Generate Code
-        </Button>
+        <GenerateDiscountCodeDialog influencers={influencerOptions} />
       </div>
 
       <Card className="border border-gray-200 shadow-sm">
