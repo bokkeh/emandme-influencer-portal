@@ -20,11 +20,25 @@ export async function POST(req: Request) {
     publicMetadata: { role },
   });
 
-  // Update role in DB
+  // Get Clerk user details
+  const clerkUser = await clerk.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+
+  // Upsert user in DB (handles case where webhook never fired)
   const [user] = await db
-    .update(users)
-    .set({ role, updatedAt: new Date() })
-    .where(eq(users.clerkUserId, userId))
+    .insert(users)
+    .values({
+      clerkUserId: userId,
+      email,
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      avatarUrl: clerkUser.imageUrl,
+      role,
+    })
+    .onConflictDoUpdate({
+      target: users.clerkUserId,
+      set: { role, updatedAt: new Date() },
+    })
     .returning();
 
   if (user) {
