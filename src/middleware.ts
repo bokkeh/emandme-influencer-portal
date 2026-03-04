@@ -1,8 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
-const isInfluencerRoute = createRouteMatcher(["/influencer(.*)"]);
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
@@ -20,18 +18,8 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-
-  if (isAdminRoute(req) && role !== "admin") {
-    return NextResponse.redirect(new URL("/influencer/dashboard", req.url));
-  }
-
-  if (isInfluencerRoute(req) && role !== "influencer" && role !== "ugc_creator") {
-    if (role === "admin") {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-    }
-    return NextResponse.redirect(new URL("/onboarding", req.url));
-  }
+  // Role checks for /admin/* and /influencer/* are handled by requireAdmin() and
+  // requireInfluencer() in each layout (with DB fallback for stale JWT claims).
 
   return NextResponse.next();
 });
