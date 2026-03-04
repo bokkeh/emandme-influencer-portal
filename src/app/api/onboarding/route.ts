@@ -48,12 +48,12 @@ export async function POST(req: Request) {
       .values({ userId: user.id })
       .onConflictDoNothing();
 
-    // Notify Google Chat
-    await googleChat.influencerJoined(
+    // Notify Google Chat (fire-and-forget — don't block response)
+    googleChat.influencerJoined(
       `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email,
       "nano",
       []
-    );
+    ).catch(() => {});
   }
 
   return NextResponse.json({ success: true, role });
