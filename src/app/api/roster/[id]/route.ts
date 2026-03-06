@@ -135,9 +135,31 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       [updated] = await db.update(influencerRoster).set(setValues).where(eq(influencerRoster.id, id)).returning();
     } catch (error) {
       if (!isMissingAvatarColumnError(error)) throw error;
-      const legacySetValues = Object.fromEntries(
-        Object.entries(setValues).filter(([key]) => key !== "avatarUrl")
-      );
+      const legacySetValues = {
+        fullName: setValues.fullName,
+        handle: setValues.handle,
+        platform: setValues.platform,
+        profileUrl: setValues.profileUrl,
+        email: setValues.email,
+        phone: setValues.phone,
+        manager: setValues.manager,
+        niche: setValues.niche,
+        location: setValues.location,
+        audienceNotes: setValues.audienceNotes,
+        followerCount: setValues.followerCount,
+        engagementRate: setValues.engagementRate,
+        avgViews: setValues.avgViews,
+        contentStyleNotes: setValues.contentStyleNotes,
+        brandFitScore: setValues.brandFitScore,
+        status: setValues.status,
+        tags: setValues.tags,
+        internalNotes: setValues.internalNotes,
+        pricingNotes: setValues.pricingNotes,
+        lastContactedAt: setValues.lastContactedAt,
+        campaignHistory: setValues.campaignHistory,
+        deliverablesCompleted: setValues.deliverablesCompleted,
+        updatedAt: setValues.updatedAt,
+      };
       [updated] = await db.update(influencerRoster).set(legacySetValues).where(eq(influencerRoster.id, id)).returning();
     }
 

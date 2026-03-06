@@ -102,9 +102,30 @@ export async function POST(req: Request) {
       [created] = await db.insert(influencerRoster).values(values).returning();
     } catch (error) {
       if (!isMissingAvatarColumnError(error)) throw error;
-      const legacyValues = Object.fromEntries(
-        Object.entries(values).filter(([key]) => key !== "avatarUrl")
-      );
+      const legacyValues = {
+        fullName: values.fullName,
+        handle: values.handle,
+        platform: values.platform,
+        profileUrl: values.profileUrl,
+        email: values.email,
+        phone: values.phone,
+        manager: values.manager,
+        niche: values.niche,
+        location: values.location,
+        audienceNotes: values.audienceNotes,
+        followerCount: values.followerCount,
+        engagementRate: values.engagementRate,
+        avgViews: values.avgViews,
+        contentStyleNotes: values.contentStyleNotes,
+        brandFitScore: values.brandFitScore,
+        status: values.status,
+        tags: values.tags,
+        internalNotes: values.internalNotes,
+        pricingNotes: values.pricingNotes,
+        lastContactedAt: values.lastContactedAt,
+        campaignHistory: values.campaignHistory,
+        deliverablesCompleted: values.deliverablesCompleted,
+      };
       [created] = await db.insert(influencerRoster).values(legacyValues).returning();
     }
 
