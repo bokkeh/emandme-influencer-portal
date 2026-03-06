@@ -9,13 +9,15 @@ async function resolveAdminUserId() {
   if (!userId) return { ok: false as const, userId: null };
 
   let role = (sessionClaims?.metadata as { role?: string })?.role;
+  let email: string | undefined;
   if (role !== "admin") {
     const [dbUser] = await db
-      .select({ role: users.role })
+      .select({ role: users.role, email: users.email })
       .from(users)
       .where(eq(users.clerkUserId, userId))
       .limit(1);
     role = dbUser?.role;
+    email = dbUser?.email ?? undefined;
   }
 
   // Last fallback: read current Clerk metadata directly (session claims can be stale).
@@ -23,14 +25,24 @@ async function resolveAdminUserId() {
     try {
       const clerk = await clerkClient();
       const clerkUser = await clerk.users.getUser(userId);
-      const metadataRole = (clerkUser.publicMetadata as { role?: string } | null)?.role;
-      role = metadataRole;
+      const publicRole = (clerkUser.publicMetadata as { role?: string } | null)?.role;
+      const privateRole = (clerkUser.privateMetadata as { role?: string } | null)?.role;
+      role = publicRole ?? privateRole ?? role;
+      email = clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
+        ?? clerkUser.emailAddresses[0]?.emailAddress
+        ?? email;
     } catch {
       // no-op; keep previous role value
     }
   }
 
-  return { ok: role === "admin", userId };
+  const allowlist = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((v) => v.trim().toLowerCase())
+    .filter(Boolean);
+  const isAllowlisted = email ? allowlist.includes(email.toLowerCase()) : false;
+
+  return { ok: role === "admin" || isAllowlisted, userId };
 }
 
 export async function POST(req: Request) {
