@@ -411,13 +411,29 @@ export function RosterClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        let message = editing ? "Failed to update influencer" : "Failed to add influencer";
+        try {
+          const data = (await res.json()) as { error?: string; message?: string };
+          if (data?.error || data?.message) message = data.error ?? data.message ?? message;
+        } catch {
+          const text = await res.text();
+          if (text) message = text;
+        }
+        throw new Error(message);
+      }
       toast.success(editing ? "Influencer updated" : "Influencer added");
       setDialogOpen(false);
       await loadRoster();
       if (selectedId) await loadDetail(selectedId);
-    } catch {
-      toast.error(editing ? "Failed to update influencer" : "Failed to add influencer");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : editing
+            ? "Failed to update influencer"
+            : "Failed to add influencer";
+      toast.error(message);
     } finally {
       setSaving(false);
     }

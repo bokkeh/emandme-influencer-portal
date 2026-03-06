@@ -24,6 +24,11 @@ function asTags(value: unknown): string[] | undefined {
     .slice(0, 20);
 }
 
+function isMissingAvatarColumnError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes("avatar_url") && message.toLowerCase().includes("does not exist");
+}
+
 async function resolveAdminUserId() {
   const { userId, sessionClaims } = await auth();
   if (!userId) return { ok: false as const, userId: null };
@@ -79,9 +84,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const hasAvgViews = Object.hasOwn(body, "avgViews");
   const hasBrandFitScore = Object.hasOwn(body, "brandFitScore");
 
-  const [updated] = await db
-    .update(influencerRoster)
-    .set({
+  try {
+    const setValues = {
       fullName: asText(body.fullName) ?? undefined,
       handle: body.handle !== undefined ? asText(body.handle) : undefined,
       platform:
@@ -124,23 +128,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ? body.deliverablesCompleted
         : undefined,
       updatedAt: new Date(),
-    })
-    .where(eq(influencerRoster.id, id))
-    .returning();
+    };
 
-  if (!updated) return new NextResponse("Not found", { status: 404 });
+    let updated: (typeof influencerRoster.$inferSelect) | undefined;
+    try {
+      [updated] = await db.update(influencerRoster).set(setValues).where(eq(influencerRoster.id, id)).returning();
+    } catch (error) {
+      if (!isMissingAvatarColumnError(error)) throw error;
+      const legacySetValues = Object.fromEntries(
+        Object.entries(setValues).filter(([key]) => key !== "avatarUrl")
+      );
+      [updated] = await db.update(influencerRoster).set(legacySetValues).where(eq(influencerRoster.id, id)).returning();
+    }
 
-  const activityNote = asText(body.activityNote);
-  if (activityNote) {
-    await db.insert(influencerRosterActivities).values({
-      rosterId: id,
-      note: activityNote,
-      type: asText(body.activityType) ?? "note",
-      createdByUserId: adminUser?.id ?? null,
-    });
+    if (!updated) return new NextResponse("Not found", { status: 404 });
+
+    const activityNote = asText(body.activityNote);
+    if (activityNote) {
+      await db.insert(influencerRosterActivities).values({
+        rosterId: id,
+        note: activityNote,
+        type: asText(body.activityType) ?? "note",
+        createdByUserId: adminUser?.id ?? null,
+      });
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected roster update error";
+    return new NextResponse(message, { status: 500 });
   }
-
-  return NextResponse.json(updated);
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -24,6 +24,11 @@ function asTags(value: unknown): string[] {
     .slice(0, 20);
 }
 
+function isMissingAvatarColumnError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes("avatar_url") && message.toLowerCase().includes("does not exist");
+}
+
 async function resolveAdminUserId() {
   const { userId, sessionClaims } = await auth();
   if (!userId) return { ok: false as const, userId: null };
@@ -63,9 +68,8 @@ export async function POST(req: Request) {
     .where(eq(users.clerkUserId, guard.userId))
     .limit(1);
 
-  const [created] = await db
-    .insert(influencerRoster)
-    .values({
+  try {
+    const values = {
       fullName,
       handle: asText(body.handle),
       platform: platform && ROSTER_PLATFORMS.includes(platform) ? platform : "instagram",
@@ -91,17 +95,31 @@ export async function POST(req: Request) {
       deliverablesCompleted: Array.isArray(body.deliverablesCompleted)
         ? body.deliverablesCompleted
         : [],
-    })
-    .returning();
+    };
 
-  if (!created) return new NextResponse("Failed to create profile", { status: 500 });
+    let created: (typeof influencerRoster.$inferSelect) | undefined;
+    try {
+      [created] = await db.insert(influencerRoster).values(values).returning();
+    } catch (error) {
+      if (!isMissingAvatarColumnError(error)) throw error;
+      const legacyValues = Object.fromEntries(
+        Object.entries(values).filter(([key]) => key !== "avatarUrl")
+      );
+      [created] = await db.insert(influencerRoster).values(legacyValues).returning();
+    }
 
-  await db.insert(influencerRosterActivities).values({
-    rosterId: created.id,
-    type: "system",
-    note: "Influencer profile added to roster",
-    createdByUserId: adminUser?.id ?? null,
-  });
+    if (!created) return new NextResponse("Failed to create profile", { status: 500 });
 
-  return NextResponse.json(created, { status: 201 });
+    await db.insert(influencerRosterActivities).values({
+      rosterId: created.id,
+      type: "system",
+      note: "Influencer profile added to roster",
+      createdByUserId: adminUser?.id ?? null,
+    });
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected roster create error";
+    return new NextResponse(message, { status: 500 });
+  }
 }
