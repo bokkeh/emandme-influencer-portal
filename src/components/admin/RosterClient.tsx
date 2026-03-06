@@ -13,7 +13,7 @@ import {
   Plus,
   Search,
   Users,
-  Archive,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -606,15 +606,20 @@ export function RosterClient({
     }
   }
 
-  async function archiveInfluencer(row: InfluencerProfile) {
+  async function deleteInfluencer(row: InfluencerProfile) {
+    const confirmed = window.confirm(
+      `Delete ${row.fullName} from roster? This permanently removes the profile.`
+    );
+    if (!confirmed) return;
+
     try {
       const res = await fetch(`/api/roster/${row.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(await res.text());
-      setRows((prev) => prev.map((item) => (item.id === row.id ? { ...item, status: "archived" } : item)));
-      if (selectedId === row.id) await loadDetail(row.id);
-      toast.success("Influencer archived");
+      setRows((prev) => prev.filter((item) => item.id !== row.id));
+      if (selectedId === row.id) setSelectedId(null);
+      toast.success("Influencer deleted");
     } catch {
-      toast.error("Failed to archive influencer");
+      toast.error("Failed to delete influencer");
     }
   }
 
@@ -1496,8 +1501,8 @@ export function RosterClient({
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => archiveInfluencer(row)}>
-                            <Archive className="h-4 w-4 text-rose-700" />
+                          <Button size="icon" variant="ghost" onClick={() => deleteInfluencer(row)}>
+                            <Trash2 className="h-4 w-4 text-rose-700" />
                           </Button>
                         </div>
                       </TableCell>

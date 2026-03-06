@@ -233,26 +233,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok || !guard.userId) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await params;
-  const [updated] = await db
-    .update(influencerRoster)
-    .set({ status: "archived", updatedAt: new Date() })
+  const [deleted] = await db
+    .delete(influencerRoster)
     .where(eq(influencerRoster.id, id))
     .returning();
 
-  if (!updated) return new NextResponse("Not found", { status: 404 });
+  if (!deleted) return new NextResponse("Not found", { status: 404 });
 
-  const [adminUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkUserId, guard.userId))
-    .limit(1);
-
-  await db.insert(influencerRosterActivities).values({
-    rosterId: id,
-    note: "Influencer archived",
-    type: "status_change",
-    createdByUserId: adminUser?.id ?? null,
-  });
-
-  return NextResponse.json(updated);
+  return NextResponse.json({ success: true, id });
 }
