@@ -222,6 +222,7 @@ export const influencerRoster = pgTable(
     handle: varchar("handle", { length: 120 }),
     platform: rosterPlatformEnum("platform").notNull().default("instagram"),
     profileUrl: text("profile_url"),
+    avatarUrl: text("avatar_url"),
 
     email: varchar("email", { length: 320 }),
     phone: varchar("phone", { length: 30 }),

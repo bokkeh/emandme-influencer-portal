@@ -59,6 +59,7 @@ export async function POST(req: Request) {
       handle: asText(body.handle),
       platform: platform && ROSTER_PLATFORMS.includes(platform) ? platform : "instagram",
       profileUrl: asText(body.profileUrl),
+      avatarUrl: asText(body.avatarUrl),
       email: asText(body.email),
       phone: asText(body.phone),
       manager: asText(body.manager),

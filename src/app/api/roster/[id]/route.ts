@@ -80,6 +80,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             ? undefined
             : undefined,
       profileUrl: body.profileUrl !== undefined ? asText(body.profileUrl) : undefined,
+      avatarUrl: body.avatarUrl !== undefined ? asText(body.avatarUrl) : undefined,
       email: body.email !== undefined ? asText(body.email) : undefined,
       phone: body.phone !== undefined ? asText(body.phone) : undefined,
       manager: body.manager !== undefined ? asText(body.manager) : undefined,

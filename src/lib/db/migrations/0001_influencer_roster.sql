@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS influencer_roster (
   handle varchar(120),
   platform roster_platform NOT NULL DEFAULT 'instagram',
   profile_url text,
+  avatar_url text,
   email varchar(320),
   phone varchar(30),
   manager varchar(200),

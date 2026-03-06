@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
   TableBody,
@@ -61,6 +62,7 @@ type RosterForm = {
   handle: string;
   platform: RosterPlatform;
   profileUrl: string;
+  avatarUrl: string;
   email: string;
   phone: string;
   manager: string;
@@ -97,6 +99,7 @@ const DEFAULT_FORM: RosterForm = {
   handle: "",
   platform: "instagram",
   profileUrl: "",
+  avatarUrl: "",
   email: "",
   phone: "",
   manager: "",
@@ -136,6 +139,7 @@ function toForm(profile?: InfluencerProfile | null): RosterForm {
     handle: profile.handle ?? "",
     platform: profile.platform,
     profileUrl: profile.profileUrl ?? "",
+    avatarUrl: profile.avatarUrl ?? "",
     email: profile.email ?? "",
     phone: profile.phone ?? "",
     manager: profile.manager ?? "",
@@ -161,6 +165,7 @@ function serializeForm(form: RosterForm) {
     handle: form.handle || null,
     platform: form.platform,
     profileUrl: form.profileUrl || null,
+    avatarUrl: form.avatarUrl || null,
     email: form.email || null,
     phone: form.phone || null,
     manager: form.manager || null,
@@ -252,6 +257,8 @@ export function RosterClient({
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [scrapingInstagram, setScrapingInstagram] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   const availableTags = useMemo(
@@ -471,6 +478,7 @@ export function RosterClient({
       "handle",
       "platform",
       "profile_url",
+      "avatar_url",
       "niche",
       "location",
       "follower_count",
@@ -490,6 +498,7 @@ export function RosterClient({
           row.handle,
           row.platform,
           row.profileUrl,
+          row.avatarUrl,
           row.niche,
           row.location,
           row.followerCount,
@@ -536,6 +545,7 @@ export function RosterClient({
           handle: row.handle || row.username,
           platform: (row.platform || "instagram").toLowerCase(),
           profileUrl: row.profile_url || row.profilelink,
+          avatarUrl: row.avatar_url || null,
           email: row.email,
           manager: row.manager || row.agency,
           niche: row.niche || row.category,
@@ -583,6 +593,48 @@ export function RosterClient({
     }
   }
 
+  async function quickAddFromInstagram() {
+    if (!instagramUrl.trim()) {
+      toast.error("Paste an Instagram URL first");
+      return;
+    }
+
+    setScrapingInstagram(true);
+    try {
+      const res = await fetch("/api/instagram/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: instagramUrl.trim() }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = (await res.json()) as {
+        username: string;
+        name: string | null;
+        avatarUrl: string | null;
+        bio: string | null;
+        followerCount: number | null;
+      };
+
+      setEditing(null);
+      setForm({
+        ...DEFAULT_FORM,
+        fullName: data.name ?? data.username,
+        handle: data.username,
+        platform: "instagram",
+        profileUrl: `https://www.instagram.com/${data.username}/`,
+        avatarUrl: data.avatarUrl ?? "",
+        followerCount: data.followerCount ? String(data.followerCount) : "",
+        audienceNotes: data.bio ?? "",
+      });
+      setDialogOpen(true);
+      toast.success("Instagram profile scraped. Fill the rest and save.");
+    } catch {
+      toast.error("Could not scrape Instagram profile");
+    } finally {
+      setScrapingInstagram(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -593,6 +645,15 @@ export function RosterClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Input
+            value={instagramUrl}
+            onChange={(e) => setInstagramUrl(e.target.value)}
+            placeholder="Paste Instagram URL..."
+            className="w-[260px]"
+          />
+          <Button variant="outline" onClick={quickAddFromInstagram} disabled={scrapingInstagram}>
+            {scrapingInstagram ? "Scraping..." : "Add from Instagram URL"}
+          </Button>
           <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={onImportCsv} />
           <Button variant="outline" onClick={() => csvInputRef.current?.click()} className="gap-2">
             <FileUp className="h-4 w-4" />
@@ -740,7 +801,17 @@ export function RosterClient({
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => setSelectedId(row.id)}
                     >
-                      <TableCell className="font-medium">{row.fullName}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={row.avatarUrl ?? undefined} />
+                            <AvatarFallback className="text-xs">
+                              {row.fullName.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{row.fullName}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "-"}</TableCell>
                       <TableCell>{titleCase(row.platform)}</TableCell>
                       <TableCell>
@@ -858,6 +929,22 @@ export function RosterClient({
               <div>
                 <Label>Social Handle</Label>
                 <Input value={form.handle} onChange={(e) => setForm((prev) => ({ ...prev, handle: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Avatar URL</Label>
+                <Input
+                  value={form.avatarUrl}
+                  onChange={(e) => setForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-end">
+                <div className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={form.avatarUrl || undefined} />
+                    <AvatarFallback>{(form.fullName || "IN").slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs text-gray-500">Profile photo preview</span>
+                </div>
               </div>
               <div>
                 <Label>Platform</Label>
@@ -1031,6 +1118,18 @@ export function RosterClient({
             <p className="p-4 text-sm text-gray-500">Loading profile...</p>
           ) : detail ? (
             <div className="space-y-4 p-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-14 w-14">
+                  <AvatarImage src={detail.profile.avatarUrl ?? undefined} />
+                  <AvatarFallback>{detail.profile.fullName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-semibold text-gray-900">{detail.profile.fullName}</p>
+                  <p className="text-xs text-gray-500">
+                    {detail.profile.handle ? `@${detail.profile.handle}` : "No handle"}
+                  </p>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-gray-400">Handle</p>

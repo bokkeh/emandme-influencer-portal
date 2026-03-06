@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users,
-  Camera,
   ClipboardList,
   Megaphone,
   ImageIcon,
@@ -20,10 +19,8 @@ import {
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Influencers", href: "/admin/influencers", icon: Users },
   { label: "My Influencers", href: "/admin/my-influencers", icon: Users },
   { label: "Roster", href: "/admin/roster", icon: ClipboardList },
-  { label: "UGC Creators", href: "/admin/ugc-creators", icon: Camera },
   { label: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { label: "Asset Library", href: "/admin/assets", icon: ImageIcon },
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
