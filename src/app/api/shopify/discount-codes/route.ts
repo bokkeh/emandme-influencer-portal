@@ -1,15 +1,42 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db, users, discountCodes } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { createShopifyDiscountCode } from "@/lib/shopify/discount-codes";
 
-export async function POST(req: Request) {
+async function resolveAdminUserId() {
   const { userId, sessionClaims } = await auth();
-  if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+  if (!userId) return { ok: false as const, userId: null };
 
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (role !== "admin") {
+    const [dbUser] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+    role = dbUser?.role;
+  }
+
+  // Last fallback: read current Clerk metadata directly (session claims can be stale).
+  if (role !== "admin") {
+    try {
+      const clerk = await clerkClient();
+      const clerkUser = await clerk.users.getUser(userId);
+      const metadataRole = (clerkUser.publicMetadata as { role?: string } | null)?.role;
+      role = metadataRole;
+    } catch {
+      // no-op; keep previous role value
+    }
+  }
+
+  return { ok: role === "admin", userId };
+}
+
+export async function POST(req: Request) {
+  const guard = await resolveAdminUserId();
+  if (!guard.userId) return new NextResponse("Unauthorized", { status: 401 });
+  if (!guard.ok) return new NextResponse("Forbidden", { status: 403 });
 
   const body = await req.json();
   const {
@@ -25,12 +52,6 @@ export async function POST(req: Request) {
   if (!influencerProfileId || !code || !discountType || discountValue === undefined) {
     return new NextResponse("Missing required fields", { status: 400 });
   }
-
-  const [user] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkUserId, userId))
-    .limit(1);
 
   // Create in Shopify
   const shopifyResult = await createShopifyDiscountCode({
