@@ -1,55 +1,55 @@
 const SHOP = process.env.SHOPIFY_SHOP_DOMAIN;
 const CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
-// Legacy static token (pre-Jan 2026 custom apps) — still supported if set
 const STATIC_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+const OAUTH_TOKEN = process.env.SHOPIFY_OAUTH_ACCESS_TOKEN;
 const API_VERSION = "2025-01";
 
-// Token cache (server-side, reused across requests within the same process)
-let cachedToken: string | null = null;
-let tokenExpiresAt = 0;
-
 async function getAccessToken(): Promise<string> {
-  // Use static token if provided (legacy custom app)
-  if (STATIC_TOKEN && !STATIC_TOKEN.includes("REPLACE_ME")) {
-    const cleaned = STATIC_TOKEN.trim();
-    // Most Admin API tokens start with shpat_ or shpss_; reject obviously wrong values early.
-    if (!cleaned.startsWith("shpat_") && !cleaned.startsWith("shpss_")) {
-      throw new Error(
-        "SHOPIFY_ADMIN_ACCESS_TOKEN looks invalid. Expected token starting with shpat_ or shpss_."
-      );
-    }
-    return cleaned;
+  const token = (STATIC_TOKEN || OAUTH_TOKEN || "").trim();
+  if (!token || token.includes("REPLACE_ME")) {
+    throw new Error(
+      "Shopify token missing. Set SHOPIFY_ADMIN_ACCESS_TOKEN (or SHOPIFY_OAUTH_ACCESS_TOKEN) to a valid Admin API access token from the store app install."
+    );
+  }
+  return token;
+}
+
+export async function exchangeShopifyOAuthCode(params: {
+  shop: string;
+  code: string;
+}): Promise<string> {
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error("SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET not configured");
   }
 
-  if (!CLIENT_ID || !CLIENT_SECRET || !SHOP) {
-    throw new Error("Shopify credentials not configured");
-  }
-
-  // Return cached token if still valid (with 5-min buffer)
-  if (cachedToken && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
-    return cachedToken;
-  }
-
-  // Fetch new token via client credentials grant
-  const res = await fetch(`https://${SHOP}/admin/oauth/access_token`, {
+  const res = await fetch(`https://${params.shop}/admin/oauth/access_token`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET,
-      grant_type: "client_credentials",
+      code: params.code,
     }),
   });
 
+  const raw = await res.text();
   if (!res.ok) {
-    throw new Error(`Shopify token fetch failed: ${res.status} ${await res.text()}`);
+    throw new Error(`Shopify OAuth token exchange failed (${res.status}): ${raw}`);
   }
 
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  cachedToken = data.access_token;
-  tokenExpiresAt = Date.now() + data.expires_in * 1000;
-  return cachedToken;
+  let json: { access_token?: string };
+  try {
+    json = JSON.parse(raw) as { access_token?: string };
+  } catch {
+    throw new Error(`Shopify OAuth token exchange returned non-JSON: ${raw.slice(0, 300)}`);
+  }
+
+  if (!json.access_token) {
+    throw new Error(`Shopify OAuth token exchange missing access_token: ${raw}`);
+  }
+
+  return json.access_token;
 }
 
 export async function shopifyGraphQL<T = unknown>(
@@ -58,17 +58,14 @@ export async function shopifyGraphQL<T = unknown>(
 ): Promise<T> {
   if (!SHOP) throw new Error("SHOPIFY_SHOP_DOMAIN not set");
   const token = await getAccessToken();
-  const res = await fetch(
-    `https://${SHOP}/admin/api/${API_VERSION}/graphql.json`,
-    {
-      method: "POST",
-      headers: {
-        "X-Shopify-Access-Token": token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query, variables }),
-    }
-  );
+  const res = await fetch(`https://${SHOP}/admin/api/${API_VERSION}/graphql.json`, {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+  });
   const raw = await res.text();
   if (!res.ok) {
     throw new Error(`Shopify GraphQL request failed (${res.status}): ${raw}`);
