@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { FaviconSettingsCard } from "@/components/admin/FaviconSettingsCard";
 
 export default function SettingsPage() {
   return (
@@ -12,6 +13,8 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500">Manage integration credentials and notifications</p>
       </div>
+
+      <FaviconSettingsCard />
 
       {/* HubSpot */}
       <Card className="border border-gray-200 shadow-sm">

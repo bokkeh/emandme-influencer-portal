@@ -290,6 +290,12 @@ export const influencerRosterActivities = pgTable(
   ]
 );
 
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SOCIAL ACCOUNTS
 // ─────────────────────────────────────────────────────────────────────────────

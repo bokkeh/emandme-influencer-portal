@@ -1,0 +1,67 @@
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import { put } from "@vercel/blob";
+import { db, appSettings, users } from "@/lib/db";
+import { eq } from "drizzle-orm";
+
+async function requireAdminApi() {
+  const { userId, sessionClaims } = await auth();
+  if (!userId) return { ok: false as const, status: 401, message: "Unauthorized" };
+
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (role !== "admin") {
+    const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+    role = dbUser?.role;
+  }
+  if (role !== "admin") return { ok: false as const, status: 403, message: "Forbidden" };
+  return { ok: true as const };
+}
+
+function isAllowedType(file: File) {
+  const allowed = new Set(["image/x-icon", "image/vnd.microsoft.icon", "image/png", "image/svg+xml"]);
+  return allowed.has(file.type);
+}
+
+export async function GET() {
+  const guard = await requireAdminApi();
+  if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
+
+  const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, "favicon_url")).limit(1);
+  return NextResponse.json({ faviconUrl: setting?.value ?? null });
+}
+
+export async function POST(req: Request) {
+  const guard = await requireAdminApi();
+  if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
+
+  const formData = await req.formData();
+  const file = formData.get("file") as File | null;
+  if (!file) return new NextResponse("No file uploaded", { status: 400 });
+  if (!isAllowedType(file)) {
+    return new NextResponse("Use .ico, .png, or .svg favicon files only", { status: 400 });
+  }
+  if (file.size > 1024 * 1024) {
+    return new NextResponse("Favicon file must be <= 1MB", { status: 400 });
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "ico";
+  const pathname = `settings/favicon-${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  const blob = await put(pathname, file, { access: "public", contentType: file.type });
+
+  await db
+    .insert(appSettings)
+    .values({
+      key: "favicon_url",
+      value: blob.url,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: {
+        value: blob.url,
+        updatedAt: new Date(),
+      },
+    });
+
+  return NextResponse.json({ faviconUrl: blob.url });
+}
