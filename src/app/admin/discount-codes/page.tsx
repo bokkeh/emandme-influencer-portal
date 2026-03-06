@@ -7,6 +7,7 @@ import { CopyButton } from "@/components/shared/CopyButton";
 import { Tag } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { GenerateDiscountCodeDialog } from "@/components/admin/GenerateDiscountCodeDialog";
+import { DeleteDiscountCodeButton } from "@/components/admin/DeleteDiscountCodeButton";
 import { format } from "date-fns";
 import {
   Table,
@@ -135,7 +136,10 @@ export default async function DiscountCodesPage() {
                         {dc.expiresAt ? format(new Date(dc.expiresAt), "MMM d, yyyy") : "Never"}
                       </TableCell>
                       <TableCell>
-                        <CopyButton text={dc.code} label="Copy" />
+                        <div className="flex items-center justify-end gap-1">
+                          <CopyButton text={dc.code} label="Copy" />
+                          <DeleteDiscountCodeButton id={dc.id} code={dc.code} />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
