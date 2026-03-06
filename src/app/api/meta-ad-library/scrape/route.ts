@@ -11,6 +11,15 @@ type ScrapedAd = {
   adText: string | null;
 };
 
+type GraphAd = {
+  id?: string;
+  ad_archive_id?: string;
+  ad_creation_time?: string;
+  page_id?: string;
+  page_name?: string;
+  ad_creative_body?: string;
+};
+
 type SearchSpec = {
   keyword: string | null;
   pageId: string | null;
@@ -92,6 +101,56 @@ function scrapeAdsFromHtml(html: string, maxResults: number): ScrapedAd[] {
   });
 }
 
+async function scrapeAdsFromGraph(params: {
+  keyword: string;
+  country: string;
+  maxResults: number;
+}): Promise<ScrapedAd[]> {
+  const token = process.env.META_ACCESS_TOKEN?.trim();
+  if (!token) throw new Error("META_ACCESS_TOKEN is not configured.");
+
+  const version = process.env.META_GRAPH_VERSION?.trim() || "v23.0";
+  const url =
+    `https://graph.facebook.com/${version}/ads_archive` +
+    `?access_token=${encodeURIComponent(token)}` +
+    `&search_terms=${encodeURIComponent(params.keyword)}` +
+    `&ad_reached_countries=${encodeURIComponent(JSON.stringify([params.country]))}` +
+    `&ad_type=ALL` +
+    `&limit=${params.maxResults}` +
+    `&fields=${encodeURIComponent(
+      "id,ad_archive_id,ad_creation_time,page_id,page_name,ad_creative_body"
+    )}`;
+
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const raw = await res.text();
+  if (!res.ok) {
+    throw new Error(`Graph API request failed (${res.status}): ${raw.slice(0, 220)}`);
+  }
+
+  let parsed: { data?: GraphAd[] };
+  try {
+    parsed = JSON.parse(raw) as { data?: GraphAd[] };
+  } catch {
+    throw new Error("Graph API returned non-JSON response.");
+  }
+
+  const rows = parsed.data ?? [];
+  return rows
+    .map((item) => ({
+      adArchiveId: item.ad_archive_id || item.id || "",
+      pageName: item.page_name ?? null,
+      pageId: item.page_id ?? null,
+      startedOn: item.ad_creation_time ?? null,
+      adText: item.ad_creative_body ? item.ad_creative_body.slice(0, 240) : null,
+    }))
+    .filter((row) => row.adArchiveId.length > 0);
+}
+
 async function resolveAdmin() {
   const { userId, sessionClaims } = await auth();
   if (!userId) return false;
@@ -151,6 +210,78 @@ export async function POST(req: Request) {
       `&q=${encodeURIComponent(parsed.keyword ?? "")}` +
       `&search_type=keyword_unordered`;
 
+  // Prefer official Graph Ads Archive API when keyword is available.
+  if (parsed.keyword) {
+    try {
+      const graphAds = await scrapeAdsFromGraph({
+        keyword: parsed.keyword,
+        country,
+        maxResults,
+      });
+
+      if (graphAds.length > 0) {
+        return NextResponse.json({
+          ads: graphAds,
+          searchUrl,
+          keyword: parsed.keyword,
+          pageId: parsed.pageId,
+          country,
+          inputType: parsed.inputType,
+          source: "graph_api",
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Graph API unavailable";
+      // Continue to HTML fallback.
+      try {
+        const response = await fetch(searchUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.8",
+            "Cache-Control": "no-cache",
+          },
+        });
+
+        if (!response.ok) {
+          return NextResponse.json({
+            ads: [],
+            searchUrl,
+            source: "fallback_html",
+            note:
+              `Graph API failed (${message}). HTML fallback was also blocked (${response.status}).`,
+          });
+        }
+
+        const html = await response.text();
+        const ads = scrapeAdsFromHtml(html, maxResults);
+        return NextResponse.json({
+          ads,
+          searchUrl,
+          keyword: parsed.keyword,
+          pageId: parsed.pageId,
+          country,
+          inputType: parsed.inputType,
+          source: "fallback_html",
+          note:
+            ads.length === 0
+              ? `Graph API failed (${message}). HTML fallback returned no parseable ads.`
+              : `Graph API failed (${message}). Showing HTML fallback results.`,
+        });
+      } catch (fallbackError) {
+        const fallbackMessage =
+          fallbackError instanceof Error ? fallbackError.message : "HTML fallback failed";
+        return NextResponse.json({
+          ads: [],
+          searchUrl,
+          source: "fallback_html",
+          note: `Graph API failed (${message}). HTML fallback failed (${fallbackMessage}).`,
+        });
+      }
+    }
+  }
+
   try {
     const response = await fetch(searchUrl, {
       headers: {
@@ -193,12 +324,14 @@ export async function POST(req: Request) {
       pageId: parsed.pageId,
       country,
       inputType: parsed.inputType,
+      source: "fallback_html",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown scrape error";
     return NextResponse.json({
       ads: [],
       searchUrl,
+      source: "fallback_html",
       note: `Scrape request failed: ${message}`,
     });
   }

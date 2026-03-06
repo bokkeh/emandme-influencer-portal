@@ -32,6 +32,7 @@ type ScrapeResponse = {
   pageId?: string;
   country?: string;
   inputType?: string;
+  source?: "graph_api" | "fallback_html";
   note?: string;
   error?: string;
 };
@@ -160,6 +161,11 @@ export function MetaAdLibraryScraper() {
                 <Link href={result.searchUrl} target="_blank" className="underline text-rose-600">
                   Open search URL
                 </Link>
+                {result.source && (
+                  <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-600">
+                    {result.source === "graph_api" ? "Graph API" : "HTML fallback"}
+                  </span>
+                )}
               </p>
             )}
             <div className="overflow-x-auto">
