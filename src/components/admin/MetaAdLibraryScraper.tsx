@@ -29,7 +29,9 @@ type ScrapeResponse = {
   ads: ScrapedAd[];
   searchUrl?: string;
   keyword?: string;
+  pageId?: string;
   country?: string;
+  inputType?: string;
   note?: string;
   error?: string;
 };
@@ -63,8 +65,12 @@ export function MetaAdLibraryScraper() {
       if (!res.ok) throw new Error(payload.error || "Failed to scrape Meta Ad Library");
 
       setResult(payload);
-      if (payload.note) toast.warning(payload.note);
-      else toast.success(`Found ${payload.ads.length} ads`);
+      if (payload.note) {
+        if (payload.ads.length > 0) toast.warning(payload.note);
+        else toast.info(payload.note);
+      } else {
+        toast.success(`Found ${payload.ads.length} ads`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to scrape Meta Ad Library";
       toast.error(message);
@@ -143,6 +149,11 @@ export function MetaAdLibraryScraper() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {result.note && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {result.note}
+              </div>
+            )}
             {result.searchUrl && (
               <p className="text-xs text-gray-500">
                 Source:{" "}

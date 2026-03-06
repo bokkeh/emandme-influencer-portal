@@ -11,6 +11,13 @@ type ScrapedAd = {
   adText: string | null;
 };
 
+type SearchSpec = {
+  keyword: string | null;
+  pageId: string | null;
+  country: string;
+  inputType: "keyword" | "ad_library_url" | "creator_marketplace_url";
+};
+
 function decode(value: string) {
   return value
     .replace(/\\"/g, '"')
@@ -21,24 +28,39 @@ function decode(value: string) {
     .trim();
 }
 
-function extractSearchParams(input: string) {
+function extractSearchParams(input: string): SearchSpec | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  const defaults = {
+  const defaults: SearchSpec = {
     keyword: trimmed,
+    pageId: null,
     country: "US",
+    inputType: "keyword",
   };
 
-  if (!trimmed.includes("facebook.com/ads/library")) return defaults;
+  if (!trimmed.includes("facebook.com/ads/library") && !trimmed.includes("business.facebook.com")) {
+    return defaults;
+  }
 
   try {
     const parsed = new URL(trimmed);
-    const keyword = parsed.searchParams.get("q")?.trim() || "";
+    const host = parsed.hostname.toLowerCase();
+    const keyword = parsed.searchParams.get("q")?.trim() || null;
     const country = parsed.searchParams.get("country")?.trim().toUpperCase() || "US";
+    const pageId =
+      parsed.searchParams.get("view_all_page_id")?.trim() ||
+      parsed.searchParams.get("asset_id")?.trim() ||
+      parsed.searchParams.get("cr_pf")?.trim() ||
+      null;
+
     return {
       keyword,
+      pageId,
       country,
+      inputType: host.includes("business.facebook.com")
+        ? "creator_marketplace_url"
+        : "ad_library_url",
     };
   } catch {
     return defaults;
@@ -108,20 +130,26 @@ export async function POST(req: Request) {
   };
 
   const parsed = extractSearchParams(body.query ?? "");
-  if (!parsed || !parsed.keyword) {
+  if (!parsed || (!parsed.keyword && !parsed.pageId)) {
     return NextResponse.json(
-      { error: "Enter competitor brand keyword or paste a Meta Ad Library URL with a search query." },
-      { status: 400 }
+      {
+        ads: [],
+        note:
+          "Enter competitor keyword, Meta Ad Library URL, or creator marketplace URL containing asset_id / page id.",
+      }
     );
   }
 
   const country = (body.country || parsed.country || "US").toUpperCase();
   const maxResults = Math.min(Math.max(body.maxResults ?? 20, 1), 100);
-  const searchUrl =
-    `https://www.facebook.com/ads/library/?active_status=all` +
-    `&ad_type=all&country=${encodeURIComponent(country)}` +
-    `&q=${encodeURIComponent(parsed.keyword)}` +
-    `&search_type=keyword_unordered`;
+  const searchUrl = parsed.pageId
+    ? `https://www.facebook.com/ads/library/?active_status=all` +
+      `&ad_type=all&country=${encodeURIComponent(country)}` +
+      `&view_all_page_id=${encodeURIComponent(parsed.pageId)}&search_type=page`
+    : `https://www.facebook.com/ads/library/?active_status=all` +
+      `&ad_type=all&country=${encodeURIComponent(country)}` +
+      `&q=${encodeURIComponent(parsed.keyword ?? "")}` +
+      `&search_type=keyword_unordered`;
 
   try {
     const response = await fetch(searchUrl, {
@@ -136,8 +164,13 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `Meta Ad Library request failed (${response.status}).` },
-        { status: 502 }
+        {
+          ads: [],
+          searchUrl,
+          note:
+            `Meta Ad Library blocked or throttled this request (${response.status}). ` +
+            "Try a simpler keyword, change country, or retry in a few minutes.",
+        }
       );
     }
 
@@ -157,10 +190,16 @@ export async function POST(req: Request) {
       ads,
       searchUrl,
       keyword: parsed.keyword,
+      pageId: parsed.pageId,
       country,
+      inputType: parsed.inputType,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown scrape error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({
+      ads: [],
+      searchUrl,
+      note: `Scrape request failed: ${message}`,
+    });
   }
 }

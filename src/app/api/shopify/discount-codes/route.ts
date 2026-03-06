@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     } = body;
 
     if (!influencerProfileId || !code || !discountType || discountValue === undefined) {
-      return new NextResponse("Missing required fields", { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     // Create in Shopify
@@ -82,6 +82,7 @@ export async function POST(req: Request) {
     return NextResponse.json(saved);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Discount code creation failed";
-    return new NextResponse(message, { status: 500 });
+    const status = /forbidden|unauthorized/i.test(message) ? 403 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

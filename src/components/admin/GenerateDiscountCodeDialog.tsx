@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -25,6 +26,17 @@ import { toast } from "sonner";
 interface Influencer {
   id: string;
   name: string;
+}
+
+async function readErrorMessage(res: Response, fallback: string) {
+  const raw = await res.text();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as { error?: string; message?: string };
+    return parsed.error ?? parsed.message ?? raw;
+  } catch {
+    return raw;
+  }
 }
 
 export function GenerateDiscountCodeDialog({ influencers }: { influencers: Influencer[] }) {
@@ -59,7 +71,10 @@ export function GenerateDiscountCodeDialog({ influencers }: { influencers: Influ
           expiresAt: expiresAt || undefined,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const message = await readErrorMessage(res, "Failed to create code.");
+        throw new Error(message);
+      }
       toast.success("Discount code created!");
       setOpen(false);
       router.refresh();
@@ -81,6 +96,9 @@ export function GenerateDiscountCodeDialog({ influencers }: { influencers: Influ
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Generate Discount Code</DialogTitle>
+          <DialogDescription>
+            Create a Shopify discount code tied to a selected influencer profile.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
