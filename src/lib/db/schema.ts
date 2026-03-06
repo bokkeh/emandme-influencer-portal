@@ -106,6 +106,25 @@ export const stripeAccountStatusEnum = pgEnum("stripe_account_status", [
   "disabled",
 ]);
 
+export const rosterPlatformEnum = pgEnum("roster_platform", [
+  "instagram",
+  "tiktok",
+  "youtube",
+  "pinterest",
+  "other",
+]);
+
+export const rosterStatusEnum = pgEnum("roster_status", [
+  "prospect",
+  "contacted",
+  "in_conversation",
+  "negotiating",
+  "confirmed",
+  "active",
+  "completed",
+  "archived",
+]);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // USERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -182,6 +201,81 @@ export const influencerProfiles = pgTable(
     index("influencer_profiles_user_id_idx").on(t.userId),
     index("influencer_profiles_tier_idx").on(t.tier),
     index("influencer_profiles_hubspot_idx").on(t.hubspotContactId),
+  ]
+);
+
+// -----------------------------------------------------------------------------
+// INFLUENCER ROSTER (lightweight CRM)
+// -----------------------------------------------------------------------------
+
+type RosterHistoryItem = {
+  date: string;
+  title: string;
+  notes?: string;
+};
+
+export const influencerRoster = pgTable(
+  "influencer_roster",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fullName: varchar("full_name", { length: 200 }).notNull(),
+    handle: varchar("handle", { length: 120 }),
+    platform: rosterPlatformEnum("platform").notNull().default("instagram"),
+    profileUrl: text("profile_url"),
+
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 30 }),
+    manager: varchar("manager", { length: 200 }),
+    niche: varchar("niche", { length: 120 }),
+    location: varchar("location", { length: 160 }),
+
+    audienceNotes: text("audience_notes"),
+    followerCount: integer("follower_count").notNull().default(0),
+    engagementRate: decimal("engagement_rate", { precision: 5, scale: 2 }),
+    avgViews: integer("avg_views"),
+    contentStyleNotes: text("content_style_notes"),
+    brandFitScore: integer("brand_fit_score"),
+
+    status: rosterStatusEnum("status").notNull().default("prospect"),
+    tags: text("tags").array().notNull().default([]),
+    internalNotes: text("internal_notes"),
+    pricingNotes: text("pricing_notes"),
+    lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+
+    campaignHistory: jsonb("campaign_history").$type<RosterHistoryItem[]>().notNull().default([]),
+    deliverablesCompleted: jsonb("deliverables_completed")
+      .$type<RosterHistoryItem[]>()
+      .notNull()
+      .default([]),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("influencer_roster_full_name_idx").on(t.fullName),
+    index("influencer_roster_status_idx").on(t.status),
+    index("influencer_roster_platform_idx").on(t.platform),
+    index("influencer_roster_last_contacted_idx").on(t.lastContactedAt),
+  ]
+);
+
+export const influencerRosterActivities = pgTable(
+  "influencer_roster_activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    rosterId: uuid("roster_id")
+      .notNull()
+      .references(() => influencerRoster.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 40 }).notNull().default("note"),
+    note: text("note").notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("influencer_roster_activities_roster_idx").on(t.rosterId),
+    index("influencer_roster_activities_created_at_idx").on(t.createdAt),
   ]
 );
 
@@ -578,6 +672,24 @@ export const influencerProfilesRelations = relations(
     payments: many(payments),
     shipments: many(shipments),
     performanceSnapshots: many(performanceSnapshots),
+  })
+);
+
+export const influencerRosterRelations = relations(influencerRoster, ({ many }) => ({
+  activities: many(influencerRosterActivities),
+}));
+
+export const influencerRosterActivitiesRelations = relations(
+  influencerRosterActivities,
+  ({ one }) => ({
+    influencer: one(influencerRoster, {
+      fields: [influencerRosterActivities.rosterId],
+      references: [influencerRoster.id],
+    }),
+    createdBy: one(users, {
+      fields: [influencerRosterActivities.createdByUserId],
+      references: [users.id],
+    }),
   })
 );
 

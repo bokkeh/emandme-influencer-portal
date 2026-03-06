@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Camera,
+  ClipboardList,
   Megaphone,
   ImageIcon,
   CreditCard,
@@ -20,6 +21,7 @@ import {
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Influencers", href: "/admin/influencers", icon: Users },
+  { label: "Roster", href: "/admin/roster", icon: ClipboardList },
   { label: "UGC Creators", href: "/admin/ugc-creators", icon: Camera },
   { label: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { label: "Asset Library", href: "/admin/assets", icon: ImageIcon },
