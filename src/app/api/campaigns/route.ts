@@ -3,11 +3,30 @@ import { NextResponse } from "next/server";
 import { db, campaigns, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
+function isSchemaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("campaigns") ||
+    lowered.includes("campaign_status") ||
+    lowered.includes("platform") ||
+    lowered.includes("does not exist") ||
+    lowered.includes("undefined table") ||
+    lowered.includes("undefined column")
+  );
+}
+
 export async function GET() {
   try {
     const allCampaigns = await db.select().from(campaigns).orderBy(campaigns.createdAt);
     return NextResponse.json(allCampaigns);
   } catch (error) {
+    if (isSchemaError(error)) {
+      return new NextResponse(
+        "Campaign database tables are missing. Run campaign DB migrations and redeploy.",
+        { status: 500 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Failed to load campaigns";
     return new NextResponse(message, { status: 500 });
   }
@@ -57,6 +76,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json(campaign, { status: 201 });
   } catch (error) {
+    if (isSchemaError(error)) {
+      return new NextResponse(
+        "Campaign database schema is incomplete. Run campaign DB migrations and try again.",
+        { status: 500 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Failed to create campaign";
     return new NextResponse(message, { status: 500 });
   }
