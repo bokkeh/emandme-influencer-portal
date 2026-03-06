@@ -275,6 +275,7 @@ export function RosterClient({
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
+  const [profileUrlSelection, setProfileUrlSelection] = useState<Record<string, string>>({});
   const [instagramUrl, setInstagramUrl] = useState("");
   const [scrapingInstagram, setScrapingInstagram] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
@@ -415,6 +416,31 @@ export function RosterClient({
   function toNullableText(value: string) {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  function normalizeExternalUrl(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.startsWith("www.")) return `https://${trimmed}`;
+    return `https://${trimmed}`;
+  }
+
+  function extractProfileUrls(raw: string | null | undefined) {
+    if (!raw) return [];
+    return raw
+      .split(/[\n,|]+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((value) => normalizeExternalUrl(value))
+      .filter((value): value is string => Boolean(value))
+      .filter((value, idx, arr) => arr.indexOf(value) === idx);
+  }
+
+  function openExternalUrl(raw: string) {
+    const normalized = normalizeExternalUrl(raw);
+    if (!normalized) return;
+    window.open(normalized, "_blank", "noopener,noreferrer");
   }
 
   async function saveInlineCell(row: InfluencerProfile, field: string, rawValue: string) {
@@ -1014,15 +1040,60 @@ export function RosterClient({
                             }}
                           />
                         ) : (
-                          <button
-                            className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "profileUrl", row.profileUrl ?? "");
-                            }}
-                          >
-                            {row.profileUrl ? "Open / Edit" : "-"}
-                          </button>
+                          (() => {
+                            const profileUrls = extractProfileUrls(row.profileUrl);
+                            if (profileUrls.length === 0) {
+                              return (
+                                <button
+                                  className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    beginCellEdit(row.id, "profileUrl", row.profileUrl ?? "");
+                                  }}
+                                >
+                                  -
+                                </button>
+                              );
+                            }
+                            return (
+                              <div className="flex items-center gap-1">
+                                <Select
+                                  value={profileUrlSelection[row.id] ?? ""}
+                                  onValueChange={(value) => {
+                                    setProfileUrlSelection((prev) => ({ ...prev, [row.id]: value }));
+                                    openExternalUrl(value);
+                                    setProfileUrlSelection((prev) => ({ ...prev, [row.id]: "" }));
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    className="h-8 w-[170px] text-xs"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <SelectValue placeholder={`Open (${profileUrls.length})`} />
+                                  </SelectTrigger>
+                                  <SelectContent onClick={(e) => e.stopPropagation()}>
+                                    {profileUrls.map((url, idx) => (
+                                      <SelectItem key={`${row.id}-profile-url-${idx}`} value={url}>
+                                        {url.replace(/^https?:\/\//i, "")}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    beginCellEdit(row.id, "profileUrl", row.profileUrl ?? "");
+                                  }}
+                                  title="Edit links"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            );
+                          })()
                         )}
                       </TableCell>
                       <TableCell>
@@ -1377,8 +1448,12 @@ export function RosterClient({
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => row.profileUrl && window.open(row.profileUrl, "_blank")}
-                            disabled={!row.profileUrl}
+                            onClick={() => {
+                              const firstUrl = extractProfileUrls(row.profileUrl)[0];
+                              if (!firstUrl) return;
+                              openExternalUrl(firstUrl);
+                            }}
+                            disabled={extractProfileUrls(row.profileUrl).length === 0}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
