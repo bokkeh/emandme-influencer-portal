@@ -10,16 +10,13 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   if (isPublicRoute(req)) return NextResponse.next();
 
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
 
   if (!userId) {
     const signInUrl = new URL("/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", req.url);
     return NextResponse.redirect(signInUrl);
   }
-
-  // Role checks for /admin/* and /influencer/* are handled by requireAdmin() and
-  // requireInfluencer() in each layout (with DB fallback for stale JWT claims).
 
   return NextResponse.next();
 });
