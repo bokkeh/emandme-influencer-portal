@@ -63,7 +63,7 @@ export async function shopifyGraphQL<T = unknown>(
     {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        "X-Shopify-Access-Token": token,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query, variables }),
