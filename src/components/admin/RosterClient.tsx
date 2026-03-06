@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowUpDown,
@@ -269,6 +268,9 @@ export function RosterClient({
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [editingCell, setEditingCell] = useState<{ rowId: string; field: string } | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [inlineSaving, setInlineSaving] = useState(false);
   const [instagramUrl, setInstagramUrl] = useState("");
   const [scrapingInstagram, setScrapingInstagram] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
@@ -395,6 +397,71 @@ export function RosterClient({
     });
     return sorted;
   }, [rows, query, platformFilter, statusFilter, locationFilter, tagFilter, sortBy]);
+
+  function beginCellEdit(rowId: string, field: string, value: string) {
+    setEditingCell({ rowId, field });
+    setEditingValue(value);
+  }
+
+  function cancelCellEdit() {
+    setEditingCell(null);
+    setEditingValue("");
+  }
+
+  function toNullableText(value: string) {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  async function saveInlineCell(row: InfluencerProfile, field: string, rawValue: string) {
+    if (inlineSaving) return;
+
+    const value = rawValue.trim();
+    const payload: Record<string, unknown> = {};
+
+    if (field === "fullName") {
+      if (!value) {
+        toast.error("Name cannot be empty");
+        return;
+      }
+      payload.fullName = value;
+    }
+    if (field === "handle") payload.handle = toNullableText(value);
+    if (field === "platform") payload.platform = value;
+    if (field === "profileUrl") payload.profileUrl = toNullableText(value);
+    if (field === "niche") payload.niche = toNullableText(value);
+    if (field === "location") payload.location = toNullableText(value);
+    if (field === "followerCount") payload.followerCount = value ? Number(value) : 0;
+    if (field === "engagementRate") payload.engagementRate = value ? Number(value) : null;
+    if (field === "email") payload.email = toNullableText(value);
+    if (field === "manager") payload.manager = toNullableText(value);
+    if (field === "status") payload.status = value;
+    if (field === "internalNotes") payload.internalNotes = toNullableText(value);
+    if (field === "lastContactedAt") payload.lastContactedAt = value || null;
+    if (field === "tags") payload.tags = parseTags(value);
+
+    setInlineSaving(true);
+    try {
+      const res = await fetch(`/api/roster/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const message = await readErrorMessage(res, "Failed to update influencer");
+        throw new Error(message);
+      }
+      const updated = (await res.json()) as InfluencerProfile;
+      setRows((prev) => prev.map((item) => (item.id === row.id ? updated : item)));
+      if (selectedId === row.id) await loadDetail(row.id);
+      cancelCellEdit();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update influencer";
+      toast.error(message);
+    } finally {
+      setInlineSaving(false);
+    }
+  }
 
   function openCreateDialog() {
     setEditing(null);
@@ -842,53 +909,403 @@ export function RosterClient({
                               {row.fullName.slice(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">{row.fullName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "-"}</TableCell>
-                      <TableCell>{titleCase(row.platform)}</TableCell>
-                      <TableCell>
-                        {row.profileUrl ? (
-                          <Link
-                            href={row.profileUrl}
-                            target="_blank"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
-                          >
-                            Open
-                          </Link>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>{row.niche ?? "-"}</TableCell>
-                      <TableCell>{row.location ?? "-"}</TableCell>
-                      <TableCell>{row.followerCount ? row.followerCount.toLocaleString() : "-"}</TableCell>
-                      <TableCell>{row.engagementRate !== null ? `${row.engagementRate}%` : "-"}</TableCell>
-                      <TableCell className="max-w-[180px] truncate">{row.email ?? "-"}</TableCell>
-                      <TableCell>{row.manager ?? "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={STATUS_STYLES[row.status]}>
-                          {titleCase(row.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[180px] truncate">{row.internalNotes ?? "-"}</TableCell>
-                      <TableCell>
-                        {row.lastContactedAt ? format(new Date(row.lastContactedAt), "MMM d, yyyy") : "-"}
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        <div className="flex flex-wrap gap-1">
-                          {row.tags.slice(0, 2).map((tag) => (
-                            <Badge key={`${row.id}-${tag}`} variant="outline" className="text-[10px]">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {row.tags.length > 2 && (
-                            <Badge variant="outline" className="text-[10px]">
-                              +{row.tags.length - 2}
-                            </Badge>
+                          {editingCell?.rowId === row.id && editingCell.field === "fullName" ? (
+                            <Input
+                              autoFocus
+                              className="h-8 w-[180px]"
+                              value={editingValue}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              onBlur={() => void saveInlineCell(row, "fullName", editingValue)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void saveInlineCell(row, "fullName", editingValue);
+                                if (e.key === "Escape") cancelCellEdit();
+                              }}
+                            />
+                          ) : (
+                            <button
+                              className="font-medium text-left hover:text-rose-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                beginCellEdit(row.id, "fullName", row.fullName);
+                              }}
+                            >
+                              {row.fullName}
+                            </button>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "handle" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[140px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "handle", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "handle", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "handle", row.handle ?? "");
+                            }}
+                          >
+                            {row.handle ? `@${row.handle.replace(/^@/, "")}` : "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "platform" ? (
+                          <Select
+                            value={editingValue || row.platform}
+                            onValueChange={(value) => void saveInlineCell(row, "platform", value)}
+                          >
+                            <SelectTrigger className="h-8 w-[130px]" onClick={(e) => e.stopPropagation()}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ROSTER_PLATFORMS.map((platform) => (
+                                <SelectItem key={`${row.id}-platform-${platform}`} value={platform}>
+                                  {titleCase(platform)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "platform", row.platform);
+                            }}
+                          >
+                            {titleCase(row.platform)}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "profileUrl" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[220px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "profileUrl", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "profileUrl", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "profileUrl", row.profileUrl ?? "");
+                            }}
+                          >
+                            {row.profileUrl ? "Open / Edit" : "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "niche" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[120px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "niche", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "niche", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "niche", row.niche ?? "");
+                            }}
+                          >
+                            {row.niche ?? "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "location" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[120px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "location", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "location", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "location", row.location ?? "");
+                            }}
+                          >
+                            {row.location ?? "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "followerCount" ? (
+                          <Input
+                            autoFocus
+                            type="number"
+                            className="h-8 w-[100px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "followerCount", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "followerCount", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "followerCount", String(row.followerCount ?? 0));
+                            }}
+                          >
+                            {row.followerCount ? row.followerCount.toLocaleString() : "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "engagementRate" ? (
+                          <Input
+                            autoFocus
+                            type="number"
+                            step="0.01"
+                            className="h-8 w-[95px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "engagementRate", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "engagementRate", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(
+                                row.id,
+                                "engagementRate",
+                                row.engagementRate !== null ? String(row.engagementRate) : ""
+                              );
+                            }}
+                          >
+                            {row.engagementRate !== null ? `${row.engagementRate}%` : "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate">
+                        {editingCell?.rowId === row.id && editingCell.field === "email" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[170px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "email", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "email", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "email", row.email ?? "");
+                            }}
+                          >
+                            {row.email ?? "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "manager" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[130px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "manager", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "manager", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "manager", row.manager ?? "");
+                            }}
+                          >
+                            {row.manager ?? "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "status" ? (
+                          <Select
+                            value={editingValue || row.status}
+                            onValueChange={(value) => void saveInlineCell(row, "status", value)}
+                          >
+                            <SelectTrigger className="h-8 w-[135px]" onClick={(e) => e.stopPropagation()}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ROSTER_STATUSES.map((status) => (
+                                <SelectItem key={`${row.id}-status-${status}`} value={status}>
+                                  {titleCase(status)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "status", row.status);
+                            }}
+                          >
+                            <Badge variant="outline" className={STATUS_STYLES[row.status]}>
+                              {titleCase(row.status)}
+                            </Badge>
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate">
+                        {editingCell?.rowId === row.id && editingCell.field === "internalNotes" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[170px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "internalNotes", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "internalNotes", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "internalNotes", row.internalNotes ?? "");
+                            }}
+                          >
+                            {row.internalNotes ?? "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "lastContactedAt" ? (
+                          <Input
+                            autoFocus
+                            type="date"
+                            className="h-8 w-[150px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "lastContactedAt", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "lastContactedAt", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(
+                                row.id,
+                                "lastContactedAt",
+                                row.lastContactedAt ? row.lastContactedAt.slice(0, 10) : ""
+                              );
+                            }}
+                          >
+                            {row.lastContactedAt ? format(new Date(row.lastContactedAt), "MMM d, yyyy") : "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        {editingCell?.rowId === row.id && editingCell.field === "tags" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[170px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "tags", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "tags", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left hover:text-rose-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "tags", row.tags.join(", "));
+                            }}
+                          >
+                            <div className="flex flex-wrap gap-1">
+                              {row.tags.length === 0 ? (
+                                <span>-</span>
+                              ) : (
+                                row.tags.slice(0, 2).map((tag) => (
+                                  <Badge key={`${row.id}-${tag}`} variant="outline" className="text-[10px]">
+                                    {tag}
+                                  </Badge>
+                                ))
+                              )}
+                              {row.tags.length > 2 && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  +{row.tags.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          </button>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
