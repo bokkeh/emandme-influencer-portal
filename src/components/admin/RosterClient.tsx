@@ -606,13 +606,24 @@ export function RosterClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: instagramUrl.trim() }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        let message = "Could not scrape Instagram profile";
+        try {
+          const payload = (await res.json()) as { error?: string };
+          if (payload?.error) message = payload.error;
+        } catch {
+          const text = await res.text();
+          if (text) message = text;
+        }
+        throw new Error(message);
+      }
       const data = (await res.json()) as {
         username: string;
         name: string | null;
         avatarUrl: string | null;
         bio: string | null;
         followerCount: number | null;
+        scraped?: boolean;
       };
 
       setEditing(null);
@@ -627,9 +638,14 @@ export function RosterClient({
         audienceNotes: data.bio ?? "",
       });
       setDialogOpen(true);
-      toast.success("Instagram profile scraped. Fill the rest and save.");
-    } catch {
-      toast.error("Could not scrape Instagram profile");
+      if (data.scraped) {
+        toast.success("Instagram profile scraped. Fill the rest and save.");
+      } else {
+        toast.warning("Profile found, but Instagram blocked full stats. You can fill details manually.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not scrape Instagram profile";
+      toast.error(message);
     } finally {
       setScrapingInstagram(false);
     }

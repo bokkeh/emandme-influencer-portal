@@ -1,15 +1,34 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { db, users } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 function extractUsername(input: string): string | null {
-  const trimmed = input.trim().replace(/\/$/, "");
-  // Full URL: https://www.instagram.com/username
-  const urlMatch = trimmed.match(/instagram\.com\/([^/?#\s]+)/);
-  if (urlMatch) return urlMatch[1];
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
   // @username or bare username
   const handleMatch = trimmed.match(/^@?([A-Za-z0-9._]{1,30})$/);
   if (handleMatch) return handleMatch[1];
+
+  // Full URL: https://www.instagram.com/username/
+  try {
+    const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+    if (!host.includes("instagram.com")) return null;
+
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    const first = (parts[0] ?? "").toLowerCase();
+    const blocked = new Set(["p", "reel", "reels", "stories", "explore", "accounts", "tv"]);
+    if (!first || blocked.has(first)) return null;
+
+    return first.replace(/^@/, "");
+  } catch {
+    return null;
+  }
+
   return null;
 }
 
@@ -34,15 +53,23 @@ function decodeHtmlEntities(str: string): string {
 }
 
 export async function POST(req: Request) {
-  const { sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
+  const { userId, sessionClaims } = await auth();
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+  if (role !== "admin") {
+    const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+    role = dbUser?.role;
+  }
   if (role !== "admin") return new NextResponse("Forbidden", { status: 403 });
 
   const { url } = await req.json();
   const username = extractUsername(url ?? "");
 
   if (!username) {
-    return NextResponse.json({ error: "Invalid Instagram URL or username" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Use an Instagram profile URL or @handle (not a post/reel URL)." },
+      { status: 400 }
+    );
   }
 
   try {
