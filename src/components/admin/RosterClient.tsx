@@ -59,6 +59,21 @@ type RosterClientProps = {
 };
 
 type SortKey = "name_asc" | "follower_desc" | "engagement_desc" | "contacted_desc";
+type SortDirection = "asc" | "desc";
+type ColumnSortKey =
+  | "fullName"
+  | "handle"
+  | "platform"
+  | "niche"
+  | "location"
+  | "followerCount"
+  | "engagementRate"
+  | "email"
+  | "manager"
+  | "status"
+  | "lastContactedAt"
+  | "tags";
+type ColumnSortState = { key: ColumnSortKey; direction: SortDirection };
 
 type RosterForm = {
   fullName: string;
@@ -262,6 +277,50 @@ function parseCsv(text: string) {
   });
 }
 
+function presetToColumnSort(sortBy: SortKey): ColumnSortState {
+  if (sortBy === "name_asc") return { key: "fullName", direction: "asc" };
+  if (sortBy === "follower_desc") return { key: "followerCount", direction: "desc" };
+  if (sortBy === "engagement_desc") return { key: "engagementRate", direction: "desc" };
+  return { key: "lastContactedAt", direction: "desc" };
+}
+
+function compareRows(a: InfluencerProfile, b: InfluencerProfile, sort: ColumnSortState) {
+  const direction = sort.direction === "asc" ? 1 : -1;
+  let result = 0;
+
+  if (sort.key === "status") {
+    result = ROSTER_STATUSES.indexOf(a.status) - ROSTER_STATUSES.indexOf(b.status);
+    return result * direction;
+  }
+
+  if (sort.key === "followerCount") {
+    result = (a.followerCount ?? 0) - (b.followerCount ?? 0);
+    return result * direction;
+  }
+
+  if (sort.key === "engagementRate") {
+    result = (Number(a.engagementRate) || 0) - (Number(b.engagementRate) || 0);
+    return result * direction;
+  }
+
+  if (sort.key === "lastContactedAt") {
+    const ad = a.lastContactedAt ? new Date(a.lastContactedAt).getTime() : 0;
+    const bd = b.lastContactedAt ? new Date(b.lastContactedAt).getTime() : 0;
+    result = ad - bd;
+    return result * direction;
+  }
+
+  const av =
+    sort.key === "tags"
+      ? a.tags.join(", ")
+      : (a[sort.key] ?? "").toString();
+  const bv =
+    sort.key === "tags"
+      ? b.tags.join(", ")
+      : (b[sort.key] ?? "").toString();
+  return av.localeCompare(bv, undefined, { sensitivity: "base" }) * direction;
+}
+
 async function readErrorMessage(res: Response, fallback: string) {
   const raw = await res.text();
   if (!raw) return fallback;
@@ -286,6 +345,7 @@ export function RosterClient({
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortKey>("contacted_desc");
+  const [columnSort, setColumnSort] = useState<ColumnSortState>(presetToColumnSort("contacted_desc"));
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InfluencerProfile | null>(null);
@@ -332,13 +392,24 @@ export function RosterClient({
         locationFilter?: string;
         tagFilter?: string;
         sortBy?: SortKey;
+        columnSort?: ColumnSortState;
       };
       setQuery(parsed.query ?? "");
       setPlatformFilter(parsed.platformFilter ?? "all");
       setStatusFilter(parsed.statusFilter ?? "all");
       setLocationFilter(parsed.locationFilter ?? "all");
       setTagFilter(parsed.tagFilter ?? "all");
-      setSortBy(parsed.sortBy ?? "contacted_desc");
+      const preset = parsed.sortBy ?? "contacted_desc";
+      setSortBy(preset);
+      if (
+        parsed.columnSort &&
+        typeof parsed.columnSort.key === "string" &&
+        (parsed.columnSort.direction === "asc" || parsed.columnSort.direction === "desc")
+      ) {
+        setColumnSort(parsed.columnSort);
+      } else {
+        setColumnSort(presetToColumnSort(preset));
+      }
     } catch {
       // no-op
     }
@@ -354,9 +425,10 @@ export function RosterClient({
         locationFilter,
         tagFilter,
         sortBy,
+        columnSort,
       })
     );
-  }, [query, platformFilter, statusFilter, locationFilter, tagFilter, sortBy]);
+  }, [query, platformFilter, statusFilter, locationFilter, tagFilter, sortBy, columnSort]);
 
   async function loadRoster() {
     setLoading(true);
@@ -416,16 +488,27 @@ export function RosterClient({
     });
 
     const sorted = [...filtered];
-    sorted.sort((a, b) => {
-      if (sortBy === "name_asc") return a.fullName.localeCompare(b.fullName);
-      if (sortBy === "follower_desc") return (b.followerCount ?? 0) - (a.followerCount ?? 0);
-      if (sortBy === "engagement_desc") return (Number(b.engagementRate) || 0) - (Number(a.engagementRate) || 0);
-      const ad = a.lastContactedAt ? new Date(a.lastContactedAt).getTime() : 0;
-      const bd = b.lastContactedAt ? new Date(b.lastContactedAt).getTime() : 0;
-      return bd - ad;
-    });
+    sorted.sort((a, b) => compareRows(a, b, columnSort));
     return sorted;
-  }, [rows, query, platformFilter, statusFilter, locationFilter, tagFilter, sortBy]);
+  }, [rows, query, platformFilter, statusFilter, locationFilter, tagFilter, columnSort]);
+
+  function toggleColumnSort(key: ColumnSortKey) {
+    setColumnSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      const defaultDirection: SortDirection =
+        key === "followerCount" || key === "engagementRate" || key === "lastContactedAt"
+          ? "desc"
+          : "asc";
+      return { key, direction: defaultDirection };
+    });
+  }
+
+  function sortIndicator(key: ColumnSortKey) {
+    if (columnSort.key !== key) return <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />;
+    return <span className="text-xs">{columnSort.direction === "asc" ? "▲" : "▼"}</span>;
+  }
 
   function beginCellEdit(rowId: string, field: string, value: string) {
     setEditingCell({ rowId, field });
@@ -889,7 +972,14 @@ export function RosterClient({
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortKey)}>
+            <Select
+              value={sortBy}
+              onValueChange={(value) => {
+                const preset = value as SortKey;
+                setSortBy(preset);
+                setColumnSort(presetToColumnSort(preset));
+              }}
+            >
               <SelectTrigger className="w-full">
                 <ArrowUpDown className="h-4 w-4 opacity-60" />
                 <SelectValue />
@@ -955,21 +1045,69 @@ export function RosterClient({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead>Name</TableHead>
-                    <TableHead>Handle</TableHead>
-                    <TableHead>Platform</TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("fullName")}>
+                        Name {sortIndicator("fullName")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("handle")}>
+                        Handle {sortIndicator("handle")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("platform")}>
+                        Platform {sortIndicator("platform")}
+                      </button>
+                    </TableHead>
                     <TableHead>Profile URL</TableHead>
                     <TableHead>Portfolio</TableHead>
-                    <TableHead>Niche</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Followers</TableHead>
-                    <TableHead>Engagement</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Manager</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("niche")}>
+                        Niche {sortIndicator("niche")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("location")}>
+                        Location {sortIndicator("location")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("followerCount")}>
+                        Followers {sortIndicator("followerCount")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("engagementRate")}>
+                        Engagement {sortIndicator("engagementRate")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("email")}>
+                        Email {sortIndicator("email")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("manager")}>
+                        Manager {sortIndicator("manager")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("status")}>
+                        Status {sortIndicator("status")}
+                      </button>
+                    </TableHead>
                     <TableHead>Notes</TableHead>
-                    <TableHead>Last Contacted</TableHead>
-                    <TableHead>Tags</TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("lastContactedAt")}>
+                        Last Contacted {sortIndicator("lastContactedAt")}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("tags")}>
+                        Tags {sortIndicator("tags")}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">Quick Actions</TableHead>
                   </TableRow>
                 </TableHeader>
