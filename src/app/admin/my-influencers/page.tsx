@@ -1,13 +1,5 @@
-import { requireAdmin } from "@/lib/auth";
-import { RosterClient } from "@/components/admin/RosterClient";
+import { redirect } from "next/navigation";
 
-export default async function MyInfluencersPage() {
-  await requireAdmin();
-
-  return (
-    <RosterClient
-      title="My Influencers"
-      subtitle="influencers tracked"
-    />
-  );
+export default function MyInfluencersPage() {
+  redirect("/admin/roster");
 }

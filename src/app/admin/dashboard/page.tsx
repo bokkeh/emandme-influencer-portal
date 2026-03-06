@@ -136,7 +136,7 @@ export default async function AdminDashboardPage() {
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base font-semibold">Recent Influencers</CardTitle>
-            <Link href="/admin/influencers">
+            <Link href="/admin/roster">
               <Button variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700">
                 View all →
               </Button>
