@@ -40,12 +40,13 @@ export default function NewCampaignPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error((await res.text()) || "Failed to create campaign");
       const campaign = await res.json();
       toast.success("Campaign created!");
       router.push(`/admin/campaigns/${campaign.id}`);
-    } catch {
-      toast.error("Failed to create campaign.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create campaign.";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

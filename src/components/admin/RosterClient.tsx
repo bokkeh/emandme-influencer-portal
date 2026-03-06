@@ -79,7 +79,11 @@ type RosterForm = {
   fullName: string;
   handle: string;
   platform: RosterPlatform;
-  profileUrl: string;
+  instagramUrl: string;
+  tiktokUrl: string;
+  youtubeUrl: string;
+  pinterestUrl: string;
+  otherProfileUrl: string;
   portfolioUrl: string;
   avatarUrl: string;
   email: string;
@@ -122,7 +126,11 @@ const DEFAULT_FORM: RosterForm = {
   fullName: "",
   handle: "",
   platform: "instagram",
-  profileUrl: "",
+  instagramUrl: "",
+  tiktokUrl: "",
+  youtubeUrl: "",
+  pinterestUrl: "",
+  otherProfileUrl: "",
   portfolioUrl: "",
   avatarUrl: "",
   email: "",
@@ -162,13 +170,102 @@ function parseTags(raw: string) {
     .filter(Boolean);
 }
 
+function normalizeExternalUrl(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("www.")) return `https://${trimmed}`;
+  return `https://${trimmed}`;
+}
+
+type ProfileLinkKey = "instagram" | "tiktok" | "youtube" | "pinterest" | "other";
+type ProfileLinkEntry = { platform: ProfileLinkKey; url: string };
+
+function inferPlatformFromUrl(url: string): ProfileLinkKey {
+  const lowered = url.toLowerCase();
+  if (lowered.includes("instagram.com")) return "instagram";
+  if (lowered.includes("tiktok.com")) return "tiktok";
+  if (lowered.includes("youtube.com") || lowered.includes("youtu.be")) return "youtube";
+  if (lowered.includes("pinterest.com")) return "pinterest";
+  return "other";
+}
+
+function parseProfileLinkEntries(raw: string | null | undefined): ProfileLinkEntry[] {
+  if (!raw) return [];
+  const entries: ProfileLinkEntry[] = [];
+  const lines = raw.split(/[\n,|]+/).map((line) => line.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const pair = line.match(/^([a-z_]+)\s*:\s*(.+)$/i);
+    const rawPlatform = pair?.[1]?.toLowerCase() ?? null;
+    const rawUrl = pair?.[2] ?? line;
+    const normalized = normalizeExternalUrl(rawUrl);
+    if (!normalized) continue;
+
+    const platform: ProfileLinkKey =
+      rawPlatform === "instagram" ||
+      rawPlatform === "tiktok" ||
+      rawPlatform === "youtube" ||
+      rawPlatform === "pinterest" ||
+      rawPlatform === "other"
+        ? rawPlatform
+        : inferPlatformFromUrl(normalized);
+
+    if (entries.some((entry) => entry.url === normalized)) continue;
+    entries.push({ platform, url: normalized });
+  }
+
+  return entries;
+}
+
+function toProfileLinkMap(raw: string | null | undefined) {
+  const map: Record<ProfileLinkKey, string> = {
+    instagram: "",
+    tiktok: "",
+    youtube: "",
+    pinterest: "",
+    other: "",
+  };
+
+  const entries = parseProfileLinkEntries(raw);
+  for (const entry of entries) {
+    if (!map[entry.platform]) map[entry.platform] = entry.url;
+    else if (entry.platform === "other") map.other = `${map.other}\n${entry.url}`.trim();
+  }
+  return map;
+}
+
+function composeProfileLinks(form: RosterForm) {
+  const parts = [
+    form.instagramUrl ? `instagram: ${form.instagramUrl}` : "",
+    form.tiktokUrl ? `tiktok: ${form.tiktokUrl}` : "",
+    form.youtubeUrl ? `youtube: ${form.youtubeUrl}` : "",
+    form.pinterestUrl ? `pinterest: ${form.pinterestUrl}` : "",
+    form.otherProfileUrl
+      ? form.otherProfileUrl
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => `other: ${line}`)
+          .join("\n")
+      : "",
+  ].filter(Boolean);
+
+  return parts.join("\n");
+}
+
 function toForm(profile?: InfluencerProfile | null): RosterForm {
   if (!profile) return DEFAULT_FORM;
+  const links = toProfileLinkMap(profile.profileUrl);
   return {
     fullName: profile.fullName ?? "",
     handle: profile.handle ?? "",
     platform: profile.platform,
-    profileUrl: profile.profileUrl ?? "",
+    instagramUrl: links.instagram,
+    tiktokUrl: links.tiktok,
+    youtubeUrl: links.youtube,
+    pinterestUrl: links.pinterest,
+    otherProfileUrl: links.other,
     portfolioUrl: profile.portfolioUrl ?? "",
     avatarUrl: profile.avatarUrl ?? "",
     email: profile.email ?? "",
@@ -196,11 +293,12 @@ function toForm(profile?: InfluencerProfile | null): RosterForm {
 }
 
 function serializeForm(form: RosterForm) {
+  const profileLinks = composeProfileLinks(form);
   return {
     fullName: form.fullName,
     handle: form.handle || null,
     platform: form.platform,
-    profileUrl: form.profileUrl || null,
+    profileUrl: profileLinks || null,
     portfolioUrl: form.portfolioUrl || null,
     avatarUrl: form.avatarUrl || null,
     email: form.email || null,
@@ -525,23 +623,8 @@ export function RosterClient({
     return trimmed.length > 0 ? trimmed : null;
   }
 
-  function normalizeExternalUrl(raw: string) {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    if (trimmed.startsWith("www.")) return `https://${trimmed}`;
-    return `https://${trimmed}`;
-  }
-
   function extractProfileUrls(raw: string | null | undefined) {
-    if (!raw) return [];
-    return raw
-      .split(/[\n,|]+/)
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((value) => normalizeExternalUrl(value))
-      .filter((value): value is string => Boolean(value))
-      .filter((value, idx, arr) => arr.indexOf(value) === idx);
+    return parseProfileLinkEntries(raw).map((entry) => entry.url);
   }
 
   function openExternalUrl(raw: string) {
@@ -877,7 +960,7 @@ export function RosterClient({
         fullName: data.name ?? data.username,
         handle: data.username,
         platform: "instagram",
-        profileUrl: `https://www.instagram.com/${data.username}/`,
+        instagramUrl: `https://www.instagram.com/${data.username}/`,
         avatarUrl: data.avatarUrl ?? "",
         followerCount: data.followerCount ? String(data.followerCount) : "",
         audienceNotes: data.bio ?? "",
@@ -1208,75 +1291,31 @@ export function RosterClient({
                         )}
                       </TableCell>
                       <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "profileUrl" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[220px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "profileUrl", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "profileUrl", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          (() => {
-                            const profileUrls = extractProfileUrls(row.profileUrl);
-                            if (profileUrls.length === 0) {
-                              return (
-                                <button
-                                  className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    beginCellEdit(row.id, "profileUrl", row.profileUrl ?? "");
-                                  }}
-                                >
-                                  -
-                                </button>
-                              );
-                            }
-                            return (
-                              <div className="flex items-center gap-1">
-                                <Select
-                                  value={profileUrlSelection[row.id] ?? ""}
-                                  onValueChange={(value) => {
-                                    setProfileUrlSelection((prev) => ({ ...prev, [row.id]: value }));
-                                    openExternalUrl(value);
-                                    setProfileUrlSelection((prev) => ({ ...prev, [row.id]: "" }));
-                                  }}
-                                >
-                                  <SelectTrigger
-                                    className="h-8 w-[170px] text-xs"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <SelectValue placeholder={`Open (${profileUrls.length})`} />
-                                  </SelectTrigger>
-                                  <SelectContent onClick={(e) => e.stopPropagation()}>
-                                    {profileUrls.map((url, idx) => (
-                                      <SelectItem key={`${row.id}-profile-url-${idx}`} value={url}>
-                                        {url.replace(/^https?:\/\//i, "")}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    beginCellEdit(row.id, "profileUrl", row.profileUrl ?? "");
-                                  }}
-                                  title="Edit links"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            );
-                          })()
-                        )}
+                        {(() => {
+                          const linkEntries = parseProfileLinkEntries(row.profileUrl);
+                          if (linkEntries.length === 0) return <span>-</span>;
+                          return (
+                            <Select
+                              value={profileUrlSelection[row.id] ?? ""}
+                              onValueChange={(value) => {
+                                setProfileUrlSelection((prev) => ({ ...prev, [row.id]: value }));
+                                openExternalUrl(value);
+                                setProfileUrlSelection((prev) => ({ ...prev, [row.id]: "" }));
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-[190px] text-xs" onClick={(e) => e.stopPropagation()}>
+                                <SelectValue placeholder={`Open (${linkEntries.length})`} />
+                              </SelectTrigger>
+                              <SelectContent onClick={(e) => e.stopPropagation()}>
+                                {linkEntries.map((entry, idx) => (
+                                  <SelectItem key={`${row.id}-profile-url-${idx}`} value={entry.url}>
+                                    {`${titleCase(entry.platform)} - ${entry.url.replace(/^https?:\/\//i, "")}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         {editingCell?.rowId === row.id && editingCell.field === "portfolioUrl" ? (
@@ -1293,15 +1332,19 @@ export function RosterClient({
                             }}
                           />
                         ) : (
-                          <button
-                            className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "portfolioUrl", row.portfolioUrl ?? "");
-                            }}
-                          >
-                            {row.portfolioUrl ? "Open / Edit" : "-"}
-                          </button>
+                          row.portfolioUrl ? (
+                            <button
+                              className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openExternalUrl(row.portfolioUrl ?? "");
+                              }}
+                            >
+                              Open
+                            </button>
+                          ) : (
+                            <span>-</span>
+                          )
                         )}
                       </TableCell>
                       <TableCell>
@@ -1659,253 +1702,309 @@ export function RosterClient({
             <DialogTitle>{editing ? "Edit Influencer" : "Add Influencer"}</DialogTitle>
           </DialogHeader>
           <form className="space-y-4 max-h-[70vh] overflow-y-auto pr-1" onSubmit={submitForm}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Full Name *</Label>
-                <Input
-                  value={form.fullName}
-                  onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label>Social Handle</Label>
-                <Input value={form.handle} onChange={(e) => setForm((prev) => ({ ...prev, handle: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Avatar URL</Label>
-                <Input
-                  value={form.avatarUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
-                />
-              </div>
-              <div className="flex items-end">
-                <div className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={form.avatarUrl || undefined} />
-                    <AvatarFallback>{(form.fullName || "IN").slice(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs text-gray-500">Profile photo preview</span>
+            <div className="rounded-md border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Basic Profile</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Full Name *</Label>
+                  <Input
+                    value={form.fullName}
+                    onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Social Handle</Label>
+                  <Input value={form.handle} onChange={(e) => setForm((prev) => ({ ...prev, handle: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Avatar URL</Label>
+                  <Input
+                    value={form.avatarUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <div className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={form.avatarUrl || undefined} />
+                      <AvatarFallback>{(form.fullName || "IN").slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs text-gray-500">Profile photo preview</span>
+                  </div>
                 </div>
               </div>
-              <div>
-                <Label>Platform</Label>
-                <Select
-                  value={form.platform}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, platform: value as RosterPlatform }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROSTER_PLATFORMS.map((platform) => (
-                      <SelectItem key={platform} value={platform}>
-                        {titleCase(platform)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Status</Label>
-                <Select
-                  value={form.status}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as RosterStatus }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROSTER_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {titleCase(status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Profile Link</Label>
-                <Input
-                  value={form.profileUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, profileUrl: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Portfolio URL</Label>
-                <Input
-                  value={form.portfolioUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, portfolioUrl: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Phone (optional)</Label>
-                <Input value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Manager / Representation</Label>
-                <Input
-                  value={form.manager}
-                  onChange={(e) => setForm((prev) => ({ ...prev, manager: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Influencer Tier</Label>
-                <Select
-                  value={form.influencerTier}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, influencerTier: value as InfluencerTier }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INFLUENCER_TIERS.map((tier) => (
-                      <SelectItem key={tier} value={tier}>
-                        {titleCase(tier)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Niche / Category</Label>
-                <Input value={form.niche} onChange={(e) => setForm((prev) => ({ ...prev, niche: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Location</Label>
-                <Input
-                  value={form.location}
-                  onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Follower Count</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.followerCount}
-                  onChange={(e) => setForm((prev) => ({ ...prev, followerCount: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Engagement Rate (%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.engagementRate}
-                  onChange={(e) => setForm((prev) => ({ ...prev, engagementRate: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Average Views / Reach</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.avgViews}
-                  onChange={(e) => setForm((prev) => ({ ...prev, avgViews: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Brand Fit Score</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.brandFitScore}
-                  onChange={(e) => setForm((prev) => ({ ...prev, brandFitScore: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Total Revenue Generated</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.totalRevenueGenerated}
-                  onChange={(e) => setForm((prev) => ({ ...prev, totalRevenueGenerated: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Total Campaigns</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.totalCampaigns}
-                  onChange={(e) => setForm((prev) => ({ ...prev, totalCampaigns: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Stripe Payout Status</Label>
-                <Select
-                  value={form.stripePayoutStatus}
-                  onValueChange={(value) =>
-                    setForm((prev) => ({ ...prev, stripePayoutStatus: value as StripePayoutStatus }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STRIPE_PAYOUT_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {titleCase(status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Portal Profile URL</Label>
-                <Input
-                  value={form.portalProfileUrl}
-                  onChange={(e) => setForm((prev) => ({ ...prev, portalProfileUrl: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Last Contacted Date</Label>
-                <Input
-                  type="date"
-                  value={form.lastContactedAt}
-                  onChange={(e) => setForm((prev) => ({ ...prev, lastContactedAt: e.target.value }))}
-                />
-              </div>
-              <div>
-                <Label>Tags (comma-separated)</Label>
-                <Input value={form.tags} onChange={(e) => setForm((prev) => ({ ...prev, tags: e.target.value }))} />
+            </div>
+
+            <div className="rounded-md border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Links & Platforms</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Primary Platform</Label>
+                  <Select
+                    value={form.platform}
+                    onValueChange={(value) => setForm((prev) => ({ ...prev, platform: value as RosterPlatform }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROSTER_PLATFORMS.map((platform) => (
+                        <SelectItem key={platform} value={platform}>
+                          {titleCase(platform)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Portfolio URL</Label>
+                  <Input
+                    value={form.portfolioUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, portfolioUrl: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Instagram URL</Label>
+                  <Input
+                    value={form.instagramUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, instagramUrl: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>TikTok URL</Label>
+                  <Input
+                    value={form.tiktokUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tiktokUrl: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>YouTube URL</Label>
+                  <Input
+                    value={form.youtubeUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, youtubeUrl: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Pinterest URL</Label>
+                  <Input
+                    value={form.pinterestUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pinterestUrl: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Other Profile URLs (one per line)</Label>
+                  <Textarea
+                    rows={3}
+                    value={form.otherProfileUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, otherProfileUrl: e.target.value }))}
+                  />
+                </div>
               </div>
             </div>
-            <div>
-              <Label>Audience Notes</Label>
-              <Textarea
-                value={form.audienceNotes}
-                onChange={(e) => setForm((prev) => ({ ...prev, audienceNotes: e.target.value }))}
-              />
+
+            <div className="rounded-md border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Contact & Representation</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Email</Label>
+                  <Input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Phone (optional)</Label>
+                  <Input value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Manager / Representation</Label>
+                  <Input
+                    value={form.manager}
+                    onChange={(e) => setForm((prev) => ({ ...prev, manager: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Location</Label>
+                  <Input
+                    value={form.location}
+                    onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Niche / Category</Label>
+                  <Input value={form.niche} onChange={(e) => setForm((prev) => ({ ...prev, niche: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Influencer Tier</Label>
+                  <Select
+                    value={form.influencerTier}
+                    onValueChange={(value) => setForm((prev) => ({ ...prev, influencerTier: value as InfluencerTier }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INFLUENCER_TIERS.map((tier) => (
+                        <SelectItem key={tier} value={tier}>
+                          {titleCase(tier)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <div>
-              <Label>Content Style Notes</Label>
-              <Textarea
-                value={form.contentStyleNotes}
-                onChange={(e) => setForm((prev) => ({ ...prev, contentStyleNotes: e.target.value }))}
-              />
+
+            <div className="rounded-md border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Performance Metrics</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Follower Count</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.followerCount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, followerCount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Engagement Rate (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.engagementRate}
+                    onChange={(e) => setForm((prev) => ({ ...prev, engagementRate: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Average Views / Reach</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.avgViews}
+                    onChange={(e) => setForm((prev) => ({ ...prev, avgViews: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Brand Fit Score</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.brandFitScore}
+                    onChange={(e) => setForm((prev) => ({ ...prev, brandFitScore: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Total Revenue Generated</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.totalRevenueGenerated}
+                    onChange={(e) => setForm((prev) => ({ ...prev, totalRevenueGenerated: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Total Campaigns</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.totalCampaigns}
+                    onChange={(e) => setForm((prev) => ({ ...prev, totalCampaigns: e.target.value }))}
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <Label>Pricing / Rate Notes</Label>
-              <Textarea
-                value={form.pricingNotes}
-                onChange={(e) => setForm((prev) => ({ ...prev, pricingNotes: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Internal Notes</Label>
-              <Textarea
-                value={form.internalNotes}
-                onChange={(e) => setForm((prev) => ({ ...prev, internalNotes: e.target.value }))}
-              />
+
+            <div className="rounded-md border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Administrative</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Status</Label>
+                  <Select
+                    value={form.status}
+                    onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as RosterStatus }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROSTER_STATUSES.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {titleCase(status)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Stripe Payout Status</Label>
+                  <Select
+                    value={form.stripePayoutStatus}
+                    onValueChange={(value) =>
+                      setForm((prev) => ({ ...prev, stripePayoutStatus: value as StripePayoutStatus }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STRIPE_PAYOUT_STATUSES.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {titleCase(status)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Portal Profile URL</Label>
+                  <Input
+                    value={form.portalProfileUrl}
+                    onChange={(e) => setForm((prev) => ({ ...prev, portalProfileUrl: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Last Contacted Date</Label>
+                  <Input
+                    type="date"
+                    value={form.lastContactedAt}
+                    onChange={(e) => setForm((prev) => ({ ...prev, lastContactedAt: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Tags (comma-separated)</Label>
+                  <Input value={form.tags} onChange={(e) => setForm((prev) => ({ ...prev, tags: e.target.value }))} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Audience Notes</Label>
+                  <Textarea
+                    value={form.audienceNotes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, audienceNotes: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Content Style Notes</Label>
+                  <Textarea
+                    value={form.contentStyleNotes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, contentStyleNotes: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Pricing / Rate Notes</Label>
+                  <Textarea
+                    value={form.pricingNotes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pricingNotes: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Internal Notes</Label>
+                  <Textarea
+                    value={form.internalNotes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, internalNotes: e.target.value }))}
+                  />
+                </div>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
