@@ -9,10 +9,22 @@ function asText(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function resolveAdminUserId() {
   const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (!userId || role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  if (!userId) return { ok: false as const, userId: null };
+
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (role !== "admin") {
+    const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+    role = dbUser?.role;
+  }
+
+  return { ok: role === "admin", userId };
+}
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await resolveAdminUserId();
+  if (!guard.ok || !guard.userId) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await params;
   const body = (await req.json()) as Record<string, unknown>;
@@ -25,7 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [adminUser] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkUserId, userId))
+    .where(eq(users.clerkUserId, guard.userId))
     .limit(1);
 
   await db.insert(influencerRosterActivities).values({

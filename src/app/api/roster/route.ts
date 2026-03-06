@@ -24,19 +24,30 @@ function asTags(value: unknown): string[] {
     .slice(0, 20);
 }
 
+async function resolveAdminUserId() {
+  const { userId, sessionClaims } = await auth();
+  if (!userId) return { ok: false as const, userId: null };
+
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (role !== "admin") {
+    const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+    role = dbUser?.role;
+  }
+
+  return { ok: role === "admin", userId };
+}
+
 export async function GET() {
-  const { sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  const guard = await resolveAdminUserId();
+  if (!guard.ok) return new NextResponse("Forbidden", { status: 403 });
 
   const rows = await db.select().from(influencerRoster).orderBy(desc(influencerRoster.updatedAt));
   return NextResponse.json(rows);
 }
 
 export async function POST(req: Request) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (!userId || role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  const guard = await resolveAdminUserId();
+  if (!guard.ok || !guard.userId) return new NextResponse("Forbidden", { status: 403 });
 
   const body = (await req.json()) as Record<string, unknown>;
   const fullName = asText(body.fullName);
@@ -49,7 +60,7 @@ export async function POST(req: Request) {
   const [adminUser] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkUserId, userId))
+    .where(eq(users.clerkUserId, guard.userId))
     .limit(1);
 
   const [created] = await db

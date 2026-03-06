@@ -24,10 +24,22 @@ function asTags(value: unknown): string[] | undefined {
     .slice(0, 20);
 }
 
+async function resolveAdminUserId() {
+  const { userId, sessionClaims } = await auth();
+  if (!userId) return { ok: false as const, userId: null };
+
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (role !== "admin") {
+    const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+    role = dbUser?.role;
+  }
+
+  return { ok: role === "admin", userId };
+}
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  const guard = await resolveAdminUserId();
+  if (!guard.ok) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await params;
   const [profile] = await db.select().from(influencerRoster).where(eq(influencerRoster.id, id)).limit(1);
@@ -43,9 +55,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (!userId || role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  const guard = await resolveAdminUserId();
+  if (!guard.ok || !guard.userId) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await params;
   const body = (await req.json()) as Record<string, unknown>;
@@ -56,7 +67,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const [adminUser] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkUserId, userId))
+    .where(eq(users.clerkUserId, guard.userId))
     .limit(1);
 
   const followerCount = asNumber(body.followerCount);
@@ -133,9 +144,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (!userId || role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  const guard = await resolveAdminUserId();
+  if (!guard.ok || !guard.userId) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await params;
   const [updated] = await db
@@ -149,7 +159,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const [adminUser] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkUserId, userId))
+    .where(eq(users.clerkUserId, guard.userId))
     .limit(1);
 
   await db.insert(influencerRosterActivities).values({
