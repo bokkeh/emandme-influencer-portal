@@ -21,12 +21,16 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role }),
       });
-      if (!res.ok) throw new Error("Failed to set role");
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(message || "Failed to set role");
+      }
       // Fire-and-forget session refresh, then hard-navigate so middleware sees fresh session
       user?.reload().catch(() => {});
       window.location.href = "/influencer/dashboard";
-    } catch {
-      toast.error("Something went wrong. Please try again.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      toast.error(message);
       setLoading(null);
     }
   }
