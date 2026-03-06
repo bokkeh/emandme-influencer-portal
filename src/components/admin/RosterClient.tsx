@@ -49,6 +49,11 @@ type DetailResponse = {
   activities: RosterActivity[];
 };
 
+type RosterClientProps = {
+  title?: string;
+  subtitle?: string;
+};
+
 type SortKey = "name_asc" | "follower_desc" | "engagement_desc" | "contacted_desc";
 
 type RosterForm = {
@@ -225,7 +230,10 @@ function parseCsv(text: string) {
   });
 }
 
-export function RosterClient() {
+export function RosterClient({
+  title = "Roster",
+  subtitle = "influencer profiles",
+}: RosterClientProps) {
   const [rows, setRows] = useState<InfluencerProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -579,8 +587,10 @@ export function RosterClient() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Roster</h1>
-          <p className="text-sm text-gray-500">{rows.length} influencer profiles</p>
+          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+          <p className="text-sm text-gray-500">
+            {rows.length} {subtitle}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={onImportCsv} />
