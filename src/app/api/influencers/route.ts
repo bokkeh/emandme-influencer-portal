@@ -99,7 +99,8 @@ export async function POST(req: Request) {
   }
 
   if (profile) {
-    const name = displayName ?? `${resolvedFirstName ?? ""} ${resolvedLastName ?? ""}`.trim() || resolvedEmail;
+    const fallbackName = `${resolvedFirstName ?? ""} ${resolvedLastName ?? ""}`.trim();
+    const name = (displayName ?? fallbackName) || resolvedEmail;
     googleChat.influencerJoined(name, tier ?? "nano", instagramHandle ? ["instagram"] : []).catch(() => {});
   }
 
