@@ -26,7 +26,7 @@ function asTags(value: unknown): string[] {
 
 function isMissingAvatarColumnError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return message.toLowerCase().includes("avatar_url") && message.toLowerCase().includes("does not exist");
+  return message.toLowerCase().includes("avatar_url");
 }
 
 async function resolveAdminUserId() {
