@@ -47,6 +47,17 @@ function isMissingOptionalColumnError(error: unknown) {
   );
 }
 
+function isSchemaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("does not exist") ||
+    lowered.includes("undefined table") ||
+    lowered.includes("undefined column") ||
+    lowered.includes("undefined object")
+  );
+}
+
 async function resolveAdminUserId() {
   const { userId, sessionClaims } = await auth();
   if (!userId) return { ok: false as const, userId: null };
@@ -64,8 +75,19 @@ export async function GET() {
   const guard = await resolveAdminUserId();
   if (!guard.ok) return new NextResponse("Forbidden", { status: 403 });
 
-  const rows = await db.select().from(influencerRoster).orderBy(desc(influencerRoster.updatedAt));
-  return NextResponse.json(rows);
+  try {
+    const rows = await db.select().from(influencerRoster).orderBy(desc(influencerRoster.updatedAt));
+    return NextResponse.json(rows);
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return new NextResponse(
+        "Roster database tables are missing. Run DB migrations for influencer_roster and related fields.",
+        { status: 500 }
+      );
+    }
+    const message = error instanceof Error ? error.message : "Unexpected roster load error";
+    return new NextResponse(message, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {

@@ -22,46 +22,79 @@ function isAllowedType(file: File) {
   return allowed.has(file.type);
 }
 
+function isSchemaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("app_settings") ||
+    lowered.includes("does not exist") ||
+    lowered.includes("undefined table") ||
+    lowered.includes("undefined column")
+  );
+}
+
 export async function GET() {
   const guard = await requireAdminApi();
   if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
 
-  const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, "favicon_url")).limit(1);
-  return NextResponse.json({ faviconUrl: setting?.value ?? null });
+  try {
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, "favicon_url")).limit(1);
+    return NextResponse.json({ faviconUrl: setting?.value ?? null });
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return new NextResponse(
+        "Site settings table is missing. Run DB migrations to create app_settings before using favicon upload.",
+        { status: 500 }
+      );
+    }
+    const message = error instanceof Error ? error.message : "Failed to load favicon settings";
+    return new NextResponse(message, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
   const guard = await requireAdminApi();
   if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-  if (!file) return new NextResponse("No file uploaded", { status: 400 });
-  if (!isAllowedType(file)) {
-    return new NextResponse("Use .ico, .png, or .svg favicon files only", { status: 400 });
-  }
-  if (file.size > 1024 * 1024) {
-    return new NextResponse("Favicon file must be <= 1MB", { status: 400 });
-  }
+  try {
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) return new NextResponse("No file uploaded", { status: 400 });
+    if (!isAllowedType(file)) {
+      return new NextResponse("Use .ico, .png, or .svg favicon files only", { status: 400 });
+    }
+    if (file.size > 1024 * 1024) {
+      return new NextResponse("Favicon file must be <= 1MB", { status: 400 });
+    }
 
-  const ext = file.name.split(".").pop()?.toLowerCase() || "ico";
-  const pathname = `settings/favicon-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const blob = await put(pathname, file, { access: "public", contentType: file.type });
+    const ext = file.name.split(".").pop()?.toLowerCase() || "ico";
+    const pathname = `settings/favicon-${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const blob = await put(pathname, file, { access: "public", contentType: file.type });
 
-  await db
-    .insert(appSettings)
-    .values({
-      key: "favicon_url",
-      value: blob.url,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: appSettings.key,
-      set: {
+    await db
+      .insert(appSettings)
+      .values({
+        key: "favicon_url",
         value: blob.url,
         updatedAt: new Date(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: appSettings.key,
+        set: {
+          value: blob.url,
+          updatedAt: new Date(),
+        },
+      });
 
-  return NextResponse.json({ faviconUrl: blob.url });
+    return NextResponse.json({ faviconUrl: blob.url });
+  } catch (error) {
+    if (isSchemaError(error)) {
+      return new NextResponse(
+        "Site settings table is missing. Run DB migrations to create app_settings before using favicon upload.",
+        { status: 500 }
+      );
+    }
+    const message = error instanceof Error ? error.message : "Failed to upload favicon";
+    return new NextResponse(message, { status: 500 });
+  }
 }
