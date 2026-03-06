@@ -34,49 +34,54 @@ async function resolveAdminUserId() {
 }
 
 export async function POST(req: Request) {
-  const guard = await resolveAdminUserId();
-  if (!guard.userId) return new NextResponse("Unauthorized", { status: 401 });
-  if (!guard.ok) return new NextResponse("Forbidden", { status: 403 });
+  try {
+    const guard = await resolveAdminUserId();
+    if (!guard.userId) return new NextResponse("Unauthorized", { status: 401 });
+    if (!guard.ok) return new NextResponse("Forbidden", { status: 403 });
 
-  const body = await req.json();
-  const {
-    influencerProfileId,
-    campaignId,
-    code,
-    discountType,
-    discountValue,
-    usageLimit,
-    expiresAt,
-  } = body;
-
-  if (!influencerProfileId || !code || !discountType || discountValue === undefined) {
-    return new NextResponse("Missing required fields", { status: 400 });
-  }
-
-  // Create in Shopify
-  const shopifyResult = await createShopifyDiscountCode({
-    code: code.toUpperCase(),
-    discountType,
-    discountValue,
-    usageLimit,
-    endsAt: expiresAt,
-  });
-
-  // Save to DB
-  const [saved] = await db
-    .insert(discountCodes)
-    .values({
+    const body = await req.json();
+    const {
       influencerProfileId,
-      campaignId: campaignId ?? null,
-      code: shopifyResult.code,
-      shopifyPriceRuleId: shopifyResult.shopifyPriceRuleId,
-      shopifyDiscountCodeId: shopifyResult.shopifyDiscountCodeId,
+      campaignId,
+      code,
       discountType,
-      discountValue: String(discountValue),
-      usageLimit: usageLimit ?? null,
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
-    })
-    .returning();
+      discountValue,
+      usageLimit,
+      expiresAt,
+    } = body;
 
-  return NextResponse.json(saved);
+    if (!influencerProfileId || !code || !discountType || discountValue === undefined) {
+      return new NextResponse("Missing required fields", { status: 400 });
+    }
+
+    // Create in Shopify
+    const shopifyResult = await createShopifyDiscountCode({
+      code: code.toUpperCase(),
+      discountType,
+      discountValue,
+      usageLimit,
+      endsAt: expiresAt,
+    });
+
+    // Save to DB
+    const [saved] = await db
+      .insert(discountCodes)
+      .values({
+        influencerProfileId,
+        campaignId: campaignId ?? null,
+        code: shopifyResult.code,
+        shopifyPriceRuleId: shopifyResult.shopifyPriceRuleId,
+        shopifyDiscountCodeId: shopifyResult.shopifyDiscountCodeId,
+        discountType,
+        discountValue: String(discountValue),
+        usageLimit: usageLimit ?? null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      })
+      .returning();
+
+    return NextResponse.json(saved);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Discount code creation failed";
+    return new NextResponse(message, { status: 500 });
+  }
 }

@@ -11,7 +11,16 @@ let tokenExpiresAt = 0;
 
 async function getAccessToken(): Promise<string> {
   // Use static token if provided (legacy custom app)
-  if (STATIC_TOKEN && !STATIC_TOKEN.includes("REPLACE_ME")) return STATIC_TOKEN;
+  if (STATIC_TOKEN && !STATIC_TOKEN.includes("REPLACE_ME")) {
+    const cleaned = STATIC_TOKEN.trim();
+    // Most Admin API tokens start with shpat_ or shpss_; reject obviously wrong values early.
+    if (!cleaned.startsWith("shpat_") && !cleaned.startsWith("shpss_")) {
+      throw new Error(
+        "SHOPIFY_ADMIN_ACCESS_TOKEN looks invalid. Expected token starting with shpat_ or shpss_."
+      );
+    }
+    return cleaned;
+  }
 
   if (!CLIENT_ID || !CLIENT_SECRET || !SHOP) {
     throw new Error("Shopify credentials not configured");
@@ -60,7 +69,18 @@ export async function shopifyGraphQL<T = unknown>(
       body: JSON.stringify({ query, variables }),
     }
   );
-  const json = (await res.json()) as { data?: T; errors?: unknown[] };
+  const raw = await res.text();
+  if (!res.ok) {
+    throw new Error(`Shopify GraphQL request failed (${res.status}): ${raw}`);
+  }
+
+  let json: { data?: T; errors?: unknown[] };
+  try {
+    json = JSON.parse(raw) as { data?: T; errors?: unknown[] };
+  } catch {
+    throw new Error(`Shopify returned non-JSON response: ${raw.slice(0, 300)}`);
+  }
+
   if (json.errors) throw new Error(`Shopify GraphQL errors: ${JSON.stringify(json.errors)}`);
   return json.data as T;
 }
