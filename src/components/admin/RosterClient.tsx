@@ -235,6 +235,18 @@ function parseCsv(text: string) {
   });
 }
 
+async function readErrorMessage(res: Response, fallback: string) {
+  const raw = await res.text();
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as { error?: string; message?: string };
+    return parsed.error ?? parsed.message ?? raw;
+  } catch {
+    return raw;
+  }
+}
+
 export function RosterClient({
   title = "Roster",
   subtitle = "influencer profiles",
@@ -412,14 +424,10 @@ export function RosterClient({
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        let message = editing ? "Failed to update influencer" : "Failed to add influencer";
-        try {
-          const data = (await res.json()) as { error?: string; message?: string };
-          if (data?.error || data?.message) message = data.error ?? data.message ?? message;
-        } catch {
-          const text = await res.text();
-          if (text) message = text;
-        }
+        const message = await readErrorMessage(
+          res,
+          editing ? "Failed to update influencer" : "Failed to add influencer"
+        );
         throw new Error(message);
       }
       toast.success(editing ? "Influencer updated" : "Influencer added");
@@ -623,14 +631,7 @@ export function RosterClient({
         body: JSON.stringify({ url: instagramUrl.trim() }),
       });
       if (!res.ok) {
-        let message = "Could not scrape Instagram profile";
-        try {
-          const payload = (await res.json()) as { error?: string };
-          if (payload?.error) message = payload.error;
-        } catch {
-          const text = await res.text();
-          if (text) message = text;
-        }
+        const message = await readErrorMessage(res, "Could not scrape Instagram profile");
         throw new Error(message);
       }
       const data = (await res.json()) as {
