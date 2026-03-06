@@ -2,7 +2,16 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db, influencerRoster, influencerRosterActivities, users } from "@/lib/db";
 import { desc, eq } from "drizzle-orm";
-import { ROSTER_PLATFORMS, ROSTER_STATUSES, type RosterPlatform, type RosterStatus } from "@/types/roster";
+import {
+  INFLUENCER_TIERS,
+  ROSTER_PLATFORMS,
+  ROSTER_STATUSES,
+  STRIPE_PAYOUT_STATUSES,
+  type InfluencerTier,
+  type RosterPlatform,
+  type RosterStatus,
+  type StripePayoutStatus,
+} from "@/types/roster";
 
 function asNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -27,7 +36,15 @@ function asTags(value: unknown): string[] | undefined {
 function isMissingOptionalColumnError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const lowered = message.toLowerCase();
-  return lowered.includes("avatar_url") || lowered.includes("portfolio_url");
+  return (
+    lowered.includes("avatar_url") ||
+    lowered.includes("portfolio_url") ||
+    lowered.includes("influencer_tier") ||
+    lowered.includes("total_revenue_generated") ||
+    lowered.includes("total_campaigns") ||
+    lowered.includes("stripe_payout_status") ||
+    lowered.includes("portal_profile_url")
+  );
 }
 
 async function resolveAdminUserId() {
@@ -69,6 +86,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const platform = asText(body.platform)?.toLowerCase() as RosterPlatform | null;
   const status = asText(body.status)?.toLowerCase().replace(" ", "_") as RosterStatus | null;
+  const influencerTier = asText(body.influencerTier)?.toLowerCase() as InfluencerTier | null;
+  const stripePayoutStatus = asText(body.stripePayoutStatus)?.toLowerCase() as StripePayoutStatus | null;
   const tags = asTags(body.tags);
   const [adminUser] = await db
     .select({ id: users.id })
@@ -80,10 +99,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const engagementRate = asNumber(body.engagementRate);
   const avgViews = asNumber(body.avgViews);
   const brandFitScore = asNumber(body.brandFitScore);
+  const totalRevenueGenerated = asNumber(body.totalRevenueGenerated);
+  const totalCampaigns = asNumber(body.totalCampaigns);
   const hasFollowerCount = Object.hasOwn(body, "followerCount");
   const hasEngagementRate = Object.hasOwn(body, "engagementRate");
   const hasAvgViews = Object.hasOwn(body, "avgViews");
   const hasBrandFitScore = Object.hasOwn(body, "brandFitScore");
+  const hasTotalRevenueGenerated = Object.hasOwn(body, "totalRevenueGenerated");
+  const hasTotalCampaigns = Object.hasOwn(body, "totalCampaigns");
 
   try {
     const setValues = {
@@ -101,6 +124,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       email: body.email !== undefined ? asText(body.email) : undefined,
       phone: body.phone !== undefined ? asText(body.phone) : undefined,
       manager: body.manager !== undefined ? asText(body.manager) : undefined,
+      influencerTier:
+        body.influencerTier !== undefined
+          ? influencerTier && INFLUENCER_TIERS.includes(influencerTier)
+            ? influencerTier
+            : undefined
+          : undefined,
       niche: body.niche !== undefined ? asText(body.niche) : undefined,
       location: body.location !== undefined ? asText(body.location) : undefined,
       audienceNotes: body.audienceNotes !== undefined ? asText(body.audienceNotes) : undefined,
@@ -110,6 +139,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       contentStyleNotes:
         body.contentStyleNotes !== undefined ? asText(body.contentStyleNotes) : undefined,
       brandFitScore: hasBrandFitScore ? brandFitScore : undefined,
+      totalRevenueGenerated:
+        hasTotalRevenueGenerated
+          ? totalRevenueGenerated !== null
+            ? String(totalRevenueGenerated)
+            : "0"
+          : undefined,
+      totalCampaigns: hasTotalCampaigns ? (totalCampaigns ?? 0) : undefined,
+      stripePayoutStatus:
+        body.stripePayoutStatus !== undefined
+          ? stripePayoutStatus && STRIPE_PAYOUT_STATUSES.includes(stripePayoutStatus)
+            ? stripePayoutStatus
+            : undefined
+          : undefined,
+      portalProfileUrl:
+        body.portalProfileUrl !== undefined ? asText(body.portalProfileUrl) : undefined,
       status:
         status && ROSTER_STATUSES.includes(status)
           ? status

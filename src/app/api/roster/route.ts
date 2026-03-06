@@ -2,7 +2,16 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db, influencerRoster, influencerRosterActivities, users } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
-import { ROSTER_PLATFORMS, ROSTER_STATUSES, type RosterPlatform, type RosterStatus } from "@/types/roster";
+import {
+  INFLUENCER_TIERS,
+  ROSTER_PLATFORMS,
+  ROSTER_STATUSES,
+  STRIPE_PAYOUT_STATUSES,
+  type InfluencerTier,
+  type RosterPlatform,
+  type RosterStatus,
+  type StripePayoutStatus,
+} from "@/types/roster";
 
 function asNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -27,7 +36,15 @@ function asTags(value: unknown): string[] {
 function isMissingOptionalColumnError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const lowered = message.toLowerCase();
-  return lowered.includes("avatar_url") || lowered.includes("portfolio_url");
+  return (
+    lowered.includes("avatar_url") ||
+    lowered.includes("portfolio_url") ||
+    lowered.includes("influencer_tier") ||
+    lowered.includes("total_revenue_generated") ||
+    lowered.includes("total_campaigns") ||
+    lowered.includes("stripe_payout_status") ||
+    lowered.includes("portal_profile_url")
+  );
 }
 
 async function resolveAdminUserId() {
@@ -61,7 +78,11 @@ export async function POST(req: Request) {
 
   const platform = asText(body.platform)?.toLowerCase() as RosterPlatform | null;
   const status = asText(body.status)?.toLowerCase().replace(" ", "_") as RosterStatus | null;
+  const influencerTier = asText(body.influencerTier)?.toLowerCase() as InfluencerTier | null;
+  const stripePayoutStatus = asText(body.stripePayoutStatus)?.toLowerCase() as StripePayoutStatus | null;
   const engagementRate = asNumber(body.engagementRate);
+  const totalRevenueGenerated = asNumber(body.totalRevenueGenerated);
+  const totalCampaigns = asNumber(body.totalCampaigns);
   const lastContactedAt = asText(body.lastContactedAt);
   const [adminUser] = await db
     .select({ id: users.id })
@@ -80,6 +101,7 @@ export async function POST(req: Request) {
       email: asText(body.email),
       phone: asText(body.phone),
       manager: asText(body.manager),
+      influencerTier: influencerTier && INFLUENCER_TIERS.includes(influencerTier) ? influencerTier : "nano",
       niche: asText(body.niche),
       location: asText(body.location),
       audienceNotes: asText(body.audienceNotes),
@@ -88,6 +110,13 @@ export async function POST(req: Request) {
       avgViews: asNumber(body.avgViews),
       contentStyleNotes: asText(body.contentStyleNotes),
       brandFitScore: asNumber(body.brandFitScore),
+      totalRevenueGenerated: totalRevenueGenerated !== null ? String(totalRevenueGenerated) : "0",
+      totalCampaigns: totalCampaigns ?? 0,
+      stripePayoutStatus:
+        stripePayoutStatus && STRIPE_PAYOUT_STATUSES.includes(stripePayoutStatus)
+          ? stripePayoutStatus
+          : "not_connected",
+      portalProfileUrl: asText(body.portalProfileUrl),
       status: status && ROSTER_STATUSES.includes(status) ? status : "prospect",
       tags: asTags(body.tags),
       internalNotes: asText(body.internalNotes),

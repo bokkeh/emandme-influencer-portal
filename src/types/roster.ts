@@ -17,8 +17,19 @@ export const ROSTER_STATUSES = [
   "archived",
 ] as const;
 
+export const INFLUENCER_TIERS = ["nano", "micro", "macro", "mega"] as const;
+export const STRIPE_PAYOUT_STATUSES = [
+  "not_connected",
+  "pending",
+  "active",
+  "restricted",
+  "disabled",
+] as const;
+
 export type RosterPlatform = (typeof ROSTER_PLATFORMS)[number];
 export type RosterStatus = (typeof ROSTER_STATUSES)[number];
+export type InfluencerTier = (typeof INFLUENCER_TIERS)[number];
+export type StripePayoutStatus = (typeof STRIPE_PAYOUT_STATUSES)[number];
 
 export type RosterHistoryItem = {
   date: string;
@@ -37,6 +48,7 @@ export type InfluencerProfile = {
   email: string | null;
   phone: string | null;
   manager: string | null;
+  influencerTier: InfluencerTier;
   niche: string | null;
   location: string | null;
   followerCount: number;
@@ -45,6 +57,10 @@ export type InfluencerProfile = {
   audienceNotes: string | null;
   contentStyleNotes: string | null;
   brandFitScore: number | null;
+  totalRevenueGenerated: number;
+  totalCampaigns: number;
+  stripePayoutStatus: StripePayoutStatus;
+  portalProfileUrl: string | null;
   status: RosterStatus;
   tags: string[];
   internalNotes: string | null;

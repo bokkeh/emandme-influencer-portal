@@ -228,6 +228,7 @@ export const influencerRoster = pgTable(
     email: varchar("email", { length: 320 }),
     phone: varchar("phone", { length: 30 }),
     manager: varchar("manager", { length: 200 }),
+    influencerTier: influencerTierEnum("influencer_tier").notNull().default("nano"),
     niche: varchar("niche", { length: 120 }),
     location: varchar("location", { length: 160 }),
 
@@ -237,6 +238,14 @@ export const influencerRoster = pgTable(
     avgViews: integer("avg_views"),
     contentStyleNotes: text("content_style_notes"),
     brandFitScore: integer("brand_fit_score"),
+    totalRevenueGenerated: decimal("total_revenue_generated", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    totalCampaigns: integer("total_campaigns").notNull().default(0),
+    stripePayoutStatus: stripeAccountStatusEnum("stripe_payout_status")
+      .notNull()
+      .default("not_connected"),
+    portalProfileUrl: text("portal_profile_url"),
 
     status: rosterStatusEnum("status").notNull().default("prospect"),
     tags: text("tags").array().notNull().default([]),

@@ -36,12 +36,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
+  INFLUENCER_TIERS,
   ROSTER_PLATFORMS,
   ROSTER_STATUSES,
+  STRIPE_PAYOUT_STATUSES,
+  type InfluencerTier,
   type InfluencerProfile,
   type RosterActivity,
   type RosterPlatform,
   type RosterStatus,
+  type StripePayoutStatus,
 } from "@/types/roster";
 
 type DetailResponse = {
@@ -66,6 +70,7 @@ type RosterForm = {
   email: string;
   phone: string;
   manager: string;
+  influencerTier: InfluencerTier;
   niche: string;
   location: string;
   audienceNotes: string;
@@ -74,6 +79,10 @@ type RosterForm = {
   avgViews: string;
   contentStyleNotes: string;
   brandFitScore: string;
+  totalRevenueGenerated: string;
+  totalCampaigns: string;
+  stripePayoutStatus: StripePayoutStatus;
+  portalProfileUrl: string;
   status: RosterStatus;
   internalNotes: string;
   pricingNotes: string;
@@ -104,6 +113,7 @@ const DEFAULT_FORM: RosterForm = {
   email: "",
   phone: "",
   manager: "",
+  influencerTier: "nano",
   niche: "",
   location: "",
   audienceNotes: "",
@@ -112,6 +122,10 @@ const DEFAULT_FORM: RosterForm = {
   avgViews: "",
   contentStyleNotes: "",
   brandFitScore: "",
+  totalRevenueGenerated: "",
+  totalCampaigns: "",
+  stripePayoutStatus: "not_connected",
+  portalProfileUrl: "",
   status: "prospect",
   internalNotes: "",
   pricingNotes: "",
@@ -145,6 +159,7 @@ function toForm(profile?: InfluencerProfile | null): RosterForm {
     email: profile.email ?? "",
     phone: profile.phone ?? "",
     manager: profile.manager ?? "",
+    influencerTier: profile.influencerTier,
     niche: profile.niche ?? "",
     location: profile.location ?? "",
     audienceNotes: profile.audienceNotes ?? "",
@@ -153,6 +168,10 @@ function toForm(profile?: InfluencerProfile | null): RosterForm {
     avgViews: profile.avgViews !== null ? String(profile.avgViews) : "",
     contentStyleNotes: profile.contentStyleNotes ?? "",
     brandFitScore: profile.brandFitScore !== null ? String(profile.brandFitScore) : "",
+    totalRevenueGenerated: String(profile.totalRevenueGenerated ?? 0),
+    totalCampaigns: String(profile.totalCampaigns ?? 0),
+    stripePayoutStatus: profile.stripePayoutStatus,
+    portalProfileUrl: profile.portalProfileUrl ?? "",
     status: profile.status,
     internalNotes: profile.internalNotes ?? "",
     pricingNotes: profile.pricingNotes ?? "",
@@ -172,6 +191,7 @@ function serializeForm(form: RosterForm) {
     email: form.email || null,
     phone: form.phone || null,
     manager: form.manager || null,
+    influencerTier: form.influencerTier,
     niche: form.niche || null,
     location: form.location || null,
     audienceNotes: form.audienceNotes || null,
@@ -180,6 +200,10 @@ function serializeForm(form: RosterForm) {
     avgViews: form.avgViews ? Number(form.avgViews) : null,
     contentStyleNotes: form.contentStyleNotes || null,
     brandFitScore: form.brandFitScore ? Number(form.brandFitScore) : null,
+    totalRevenueGenerated: form.totalRevenueGenerated ? Number(form.totalRevenueGenerated) : 0,
+    totalCampaigns: form.totalCampaigns ? Number(form.totalCampaigns) : 0,
+    stripePayoutStatus: form.stripePayoutStatus,
+    portalProfileUrl: form.portalProfileUrl || null,
     status: form.status,
     internalNotes: form.internalNotes || null,
     pricingNotes: form.pricingNotes || null,
@@ -608,7 +632,12 @@ export function RosterClient({
       "engagement_rate",
       "email",
       "manager",
+      "influencer_tier",
       "status",
+      "total_revenue_generated",
+      "total_campaigns",
+      "stripe_payout_status",
+      "portal_profile_url",
       "last_contacted",
       "tags",
       "notes",
@@ -629,7 +658,12 @@ export function RosterClient({
           row.engagementRate,
           row.email,
           row.manager,
+          row.influencerTier,
           row.status,
+          row.totalRevenueGenerated,
+          row.totalCampaigns,
+          row.stripePayoutStatus,
+          row.portalProfileUrl,
           row.lastContactedAt ? row.lastContactedAt.slice(0, 10) : "",
           row.tags.join("|"),
           row.internalNotes,
@@ -673,12 +707,17 @@ export function RosterClient({
           avatarUrl: row.avatar_url || null,
           email: row.email,
           manager: row.manager || row.agency,
+          influencerTier: (row.influencer_tier || row.tier || "nano").toLowerCase(),
           niche: row.niche || row.category,
           location: row.location,
           followerCount: row.follower_count || row.followers || 0,
           engagementRate: row.engagement_rate || row.er || null,
           avgViews: row.avg_views || row.average_views || null,
           status: (row.status || "prospect").toLowerCase().replace(" ", "_"),
+          totalRevenueGenerated: row.total_revenue_generated || row.revenue || 0,
+          totalCampaigns: row.total_campaigns || 0,
+          stripePayoutStatus: (row.stripe_payout_status || "not_connected").toLowerCase(),
+          portalProfileUrl: row.portal_profile_url || null,
           tags,
           internalNotes: row.notes || row.internal_notes || null,
           lastContactedAt: row.last_contacted || null,
@@ -1572,6 +1611,24 @@ export function RosterClient({
                 />
               </div>
               <div>
+                <Label>Influencer Tier</Label>
+                <Select
+                  value={form.influencerTier}
+                  onValueChange={(value) => setForm((prev) => ({ ...prev, influencerTier: value as InfluencerTier }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INFLUENCER_TIERS.map((tier) => (
+                      <SelectItem key={tier} value={tier}>
+                        {titleCase(tier)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Niche / Category</Label>
                 <Input value={form.niche} onChange={(e) => setForm((prev) => ({ ...prev, niche: e.target.value }))} />
               </div>
@@ -1618,6 +1675,52 @@ export function RosterClient({
                   max={100}
                   value={form.brandFitScore}
                   onChange={(e) => setForm((prev) => ({ ...prev, brandFitScore: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Total Revenue Generated</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.totalRevenueGenerated}
+                  onChange={(e) => setForm((prev) => ({ ...prev, totalRevenueGenerated: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Total Campaigns</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.totalCampaigns}
+                  onChange={(e) => setForm((prev) => ({ ...prev, totalCampaigns: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Stripe Payout Status</Label>
+                <Select
+                  value={form.stripePayoutStatus}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({ ...prev, stripePayoutStatus: value as StripePayoutStatus }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STRIPE_PAYOUT_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {titleCase(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Portal Profile URL</Label>
+                <Input
+                  value={form.portalProfileUrl}
+                  onChange={(e) => setForm((prev) => ({ ...prev, portalProfileUrl: e.target.value }))}
                 />
               </div>
               <div>
@@ -1770,8 +1873,41 @@ export function RosterClient({
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <p>
+                    <span className="text-gray-500">Influencer tier:</span>{" "}
+                    {titleCase(detail.profile.influencerTier)}
+                  </p>
+                  <p>
                     <span className="text-gray-500">Brand fit score:</span>{" "}
                     {detail.profile.brandFitScore ?? "-"}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Total revenue generated:</span>{" "}
+                    ${Number(detail.profile.totalRevenueGenerated ?? 0).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Total campaigns:</span>{" "}
+                    {detail.profile.totalCampaigns ?? 0}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Stripe payout status:</span>{" "}
+                    {titleCase(detail.profile.stripePayoutStatus)}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Portal profile URL:</span>{" "}
+                    {detail.profile.portalProfileUrl ? (
+                      <a
+                        href={detail.profile.portalProfileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-rose-600 hover:text-rose-700 underline underline-offset-2"
+                      >
+                        Open profile
+                      </a>
+                    ) : (
+                      "-"
+                    )}
                   </p>
                   <p>
                     <span className="text-gray-500">Audience notes:</span>{" "}
