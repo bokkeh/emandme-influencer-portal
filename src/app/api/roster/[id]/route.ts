@@ -24,9 +24,10 @@ function asTags(value: unknown): string[] | undefined {
     .slice(0, 20);
 }
 
-function isMissingAvatarColumnError(error: unknown) {
+function isMissingOptionalColumnError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return message.toLowerCase().includes("avatar_url");
+  const lowered = message.toLowerCase();
+  return lowered.includes("avatar_url") || lowered.includes("portfolio_url");
 }
 
 async function resolveAdminUserId() {
@@ -95,6 +96,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             ? undefined
             : undefined,
       profileUrl: body.profileUrl !== undefined ? asText(body.profileUrl) : undefined,
+      portfolioUrl: body.portfolioUrl !== undefined ? asText(body.portfolioUrl) : undefined,
       avatarUrl: body.avatarUrl !== undefined ? asText(body.avatarUrl) : undefined,
       email: body.email !== undefined ? asText(body.email) : undefined,
       phone: body.phone !== undefined ? asText(body.phone) : undefined,
@@ -134,7 +136,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     try {
       [updated] = await db.update(influencerRoster).set(setValues).where(eq(influencerRoster.id, id)).returning();
     } catch (error) {
-      if (!isMissingAvatarColumnError(error)) throw error;
+      if (!isMissingOptionalColumnError(error)) throw error;
       const legacySetValues = {
         fullName: setValues.fullName,
         handle: setValues.handle,

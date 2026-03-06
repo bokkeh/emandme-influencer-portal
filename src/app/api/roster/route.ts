@@ -24,9 +24,10 @@ function asTags(value: unknown): string[] {
     .slice(0, 20);
 }
 
-function isMissingAvatarColumnError(error: unknown) {
+function isMissingOptionalColumnError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return message.toLowerCase().includes("avatar_url");
+  const lowered = message.toLowerCase();
+  return lowered.includes("avatar_url") || lowered.includes("portfolio_url");
 }
 
 async function resolveAdminUserId() {
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
       handle: asText(body.handle),
       platform: platform && ROSTER_PLATFORMS.includes(platform) ? platform : "instagram",
       profileUrl: asText(body.profileUrl),
+      portfolioUrl: asText(body.portfolioUrl),
       avatarUrl: asText(body.avatarUrl),
       email: asText(body.email),
       phone: asText(body.phone),
@@ -101,7 +103,7 @@ export async function POST(req: Request) {
     try {
       [created] = await db.insert(influencerRoster).values(values).returning();
     } catch (error) {
-      if (!isMissingAvatarColumnError(error)) throw error;
+      if (!isMissingOptionalColumnError(error)) throw error;
       const legacyValues = {
         fullName: values.fullName,
         handle: values.handle,

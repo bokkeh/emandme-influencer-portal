@@ -32,6 +32,7 @@ export type InfluencerProfile = {
   handle: string | null;
   platform: RosterPlatform;
   profileUrl: string | null;
+  portfolioUrl: string | null;
   avatarUrl: string | null;
   email: string | null;
   phone: string | null;

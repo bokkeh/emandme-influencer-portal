@@ -61,6 +61,7 @@ type RosterForm = {
   handle: string;
   platform: RosterPlatform;
   profileUrl: string;
+  portfolioUrl: string;
   avatarUrl: string;
   email: string;
   phone: string;
@@ -98,6 +99,7 @@ const DEFAULT_FORM: RosterForm = {
   handle: "",
   platform: "instagram",
   profileUrl: "",
+  portfolioUrl: "",
   avatarUrl: "",
   email: "",
   phone: "",
@@ -138,6 +140,7 @@ function toForm(profile?: InfluencerProfile | null): RosterForm {
     handle: profile.handle ?? "",
     platform: profile.platform,
     profileUrl: profile.profileUrl ?? "",
+    portfolioUrl: profile.portfolioUrl ?? "",
     avatarUrl: profile.avatarUrl ?? "",
     email: profile.email ?? "",
     phone: profile.phone ?? "",
@@ -164,6 +167,7 @@ function serializeForm(form: RosterForm) {
     handle: form.handle || null,
     platform: form.platform,
     profileUrl: form.profileUrl || null,
+    portfolioUrl: form.portfolioUrl || null,
     avatarUrl: form.avatarUrl || null,
     email: form.email || null,
     phone: form.phone || null,
@@ -429,6 +433,7 @@ export function RosterClient({
     if (field === "handle") payload.handle = toNullableText(value);
     if (field === "platform") payload.platform = value;
     if (field === "profileUrl") payload.profileUrl = toNullableText(value);
+    if (field === "portfolioUrl") payload.portfolioUrl = toNullableText(value);
     if (field === "niche") payload.niche = toNullableText(value);
     if (field === "location") payload.location = toNullableText(value);
     if (field === "followerCount") payload.followerCount = value ? Number(value) : 0;
@@ -569,6 +574,7 @@ export function RosterClient({
       "handle",
       "platform",
       "profile_url",
+      "portfolio_url",
       "avatar_url",
       "niche",
       "location",
@@ -589,6 +595,7 @@ export function RosterClient({
           row.handle,
           row.platform,
           row.profileUrl,
+          row.portfolioUrl,
           row.avatarUrl,
           row.niche,
           row.location,
@@ -636,6 +643,7 @@ export function RosterClient({
           handle: row.handle || row.username,
           platform: (row.platform || "instagram").toLowerCase(),
           profileUrl: row.profile_url || row.profilelink,
+          portfolioUrl: row.portfolio_url || row.portfolio || row.website || row.site_url || null,
           avatarUrl: row.avatar_url || null,
           email: row.email,
           manager: row.manager || row.agency,
@@ -881,6 +889,7 @@ export function RosterClient({
                     <TableHead>Handle</TableHead>
                     <TableHead>Platform</TableHead>
                     <TableHead>Profile URL</TableHead>
+                    <TableHead>Portfolio</TableHead>
                     <TableHead>Niche</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Followers</TableHead>
@@ -1013,6 +1022,32 @@ export function RosterClient({
                             }}
                           >
                             {row.profileUrl ? "Open / Edit" : "-"}
+                          </button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingCell?.rowId === row.id && editingCell.field === "portfolioUrl" ? (
+                          <Input
+                            autoFocus
+                            className="h-8 w-[220px]"
+                            value={editingValue}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={() => void saveInlineCell(row, "portfolioUrl", editingValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveInlineCell(row, "portfolioUrl", editingValue);
+                              if (e.key === "Escape") cancelCellEdit();
+                            }}
+                          />
+                        ) : (
+                          <button
+                            className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginCellEdit(row.id, "portfolioUrl", row.portfolioUrl ?? "");
+                            }}
+                          >
+                            {row.portfolioUrl ? "Open / Edit" : "-"}
                           </button>
                         )}
                       </TableCell>
@@ -1440,6 +1475,13 @@ export function RosterClient({
                 />
               </div>
               <div>
+                <Label>Portfolio URL</Label>
+                <Input
+                  value={form.portfolioUrl}
+                  onChange={(e) => setForm((prev) => ({ ...prev, portfolioUrl: e.target.value }))}
+                />
+              </div>
+              <div>
                 <Label>Email</Label>
                 <Input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
               </div>
@@ -1588,6 +1630,21 @@ export function RosterClient({
                 <div>
                   <p className="text-xs text-gray-400">Platform</p>
                   <p>{titleCase(detail.profile.platform)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400">Portfolio</p>
+                  {detail.profile.portfolioUrl ? (
+                    <a
+                      href={detail.profile.portfolioUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-rose-600 hover:text-rose-700 underline underline-offset-2"
+                    >
+                      Open portfolio
+                    </a>
+                  ) : (
+                    <p>-</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Email</p>
