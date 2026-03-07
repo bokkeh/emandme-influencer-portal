@@ -15,6 +15,7 @@ import {
   Tag,
   BarChart3,
   Settings,
+  FileText,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: "Campaigns", href: "/admin/campaigns", icon: Megaphone },
   { label: "Asset Library", href: "/admin/assets", icon: ImageIcon },
   { label: "Payments", href: "/admin/payments", icon: CreditCard },
+  { label: "Tax Documents", href: "/admin/tax-documents", icon: FileText },
   { label: "Shipping", href: "/admin/shipping", icon: Package },
   { label: "UTM Generator", href: "/admin/utm", icon: Link2 },
   { label: "Discount Codes", href: "/admin/discount-codes", icon: Tag },

@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: "My Assets", href: "/influencer/assets" },
   { label: "My Links", href: "/influencer/links" },
   { label: "Payments", href: "/influencer/payments" },
+  { label: "Tax Docs", href: "/influencer/tax-documents" },
   { label: "Profile", href: "/influencer/profile" },
 ];
 

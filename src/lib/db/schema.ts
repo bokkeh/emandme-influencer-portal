@@ -175,6 +175,17 @@ export const influencerProfiles = pgTable(
     shippingPostalCode: varchar("shipping_postal_code", { length: 20 }),
     shippingCountry: varchar("shipping_country", { length: 2 }).default("US"),
 
+    taxLegalName: varchar("tax_legal_name", { length: 200 }),
+    taxClassification: varchar("tax_classification", { length: 50 }),
+    taxIdLast4: varchar("tax_id_last4", { length: 4 }),
+    taxAddressLine1: varchar("tax_address_line1", { length: 255 }),
+    taxAddressLine2: varchar("tax_address_line2", { length: 255 }),
+    taxCity: varchar("tax_city", { length: 100 }),
+    taxState: varchar("tax_state", { length: 100 }),
+    taxPostalCode: varchar("tax_postal_code", { length: 20 }),
+    taxCountry: varchar("tax_country", { length: 2 }).default("US"),
+    taxFormSubmittedAt: timestamp("tax_form_submitted_at", { withTimezone: true }),
+
     stripeAccountId: varchar("stripe_account_id", { length: 255 }),
     stripeAccountStatus: stripeAccountStatusEnum("stripe_account_status")
       .notNull()
@@ -554,6 +565,28 @@ export const discountCodes = pgTable(
 // PAYMENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const taxDocuments = pgTable(
+  "tax_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    influencerProfileId: uuid("influencer_profile_id")
+      .notNull()
+      .references(() => influencerProfiles.id, { onDelete: "cascade" }),
+    taxYear: integer("tax_year").notNull(),
+    documentType: varchar("document_type", { length: 40 }).notNull().default("1099_nec"),
+    fileUrl: text("file_url").notNull(),
+    fileName: varchar("file_name", { length: 255 }),
+    uploadedByUserId: uuid("uploaded_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("tax_documents_profile_year_type_idx").on(t.influencerProfileId, t.taxYear, t.documentType),
+    index("tax_documents_profile_idx").on(t.influencerProfileId),
+    index("tax_documents_year_idx").on(t.taxYear),
+  ]
+);
+
 export const payments = pgTable(
   "payments",
   {
@@ -693,6 +726,7 @@ export const influencerProfilesRelations = relations(
     assets: many(assets),
     utmLinks: many(utmLinks),
     discountCodes: many(discountCodes),
+    taxDocuments: many(taxDocuments),
     payments: many(payments),
     shipments: many(shipments),
     performanceSnapshots: many(performanceSnapshots),
@@ -786,6 +820,17 @@ export const discountCodesRelations = relations(discountCodes, ({ one }) => ({
   campaign: one(campaigns, {
     fields: [discountCodes.campaignId],
     references: [campaigns.id],
+  }),
+}));
+
+export const taxDocumentsRelations = relations(taxDocuments, ({ one }) => ({
+  influencerProfile: one(influencerProfiles, {
+    fields: [taxDocuments.influencerProfileId],
+    references: [influencerProfiles.id],
+  }),
+  uploadedBy: one(users, {
+    fields: [taxDocuments.uploadedByUserId],
+    references: [users.id],
   }),
 }));
 
