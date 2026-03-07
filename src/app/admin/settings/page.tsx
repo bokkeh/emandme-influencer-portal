@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { FaviconSettingsCard } from "@/components/admin/FaviconSettingsCard";
+import { HubSpotSyncTestCard } from "@/components/admin/HubSpotSyncTestCard";
 
 export default function SettingsPage() {
   return (
@@ -15,6 +16,7 @@ export default function SettingsPage() {
       </div>
 
       <FaviconSettingsCard />
+      <HubSpotSyncTestCard />
 
       {/* HubSpot */}
       <Card className="border border-gray-200 shadow-sm">

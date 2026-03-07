@@ -27,7 +27,7 @@ export async function syncInfluencerToHubSpot({ influencerProfileId }: SyncParam
     .where(eq(influencerProfiles.id, influencerProfileId))
     .limit(1);
 
-  if (!profile) return;
+  if (!profile) return { success: false as const, reason: "PROFILE_NOT_FOUND" as const };
 
   const properties: Record<string, string> = {
     email: profile.userEmail,
@@ -68,4 +68,12 @@ export async function syncInfluencerToHubSpot({ influencerProfileId }: SyncParam
       .set({ hubspotLastSyncedAt: new Date() })
       .where(eq(influencerProfiles.id, influencerProfileId));
   }
+
+  return {
+    success: true as const,
+    influencerProfileId: profile.id,
+    contactId: contactId ?? null,
+    email: profile.userEmail,
+    syncedAt: new Date().toISOString(),
+  };
 }
