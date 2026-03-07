@@ -228,6 +228,7 @@ export const influencerRoster = pgTable(
     email: varchar("email", { length: 320 }),
     phone: varchar("phone", { length: 30 }),
     manager: varchar("manager", { length: 200 }),
+    creatorType: varchar("creator_type", { length: 20 }).notNull().default("influencer"),
     influencerTier: influencerTierEnum("influencer_tier").notNull().default("nano"),
     niche: varchar("niche", { length: 120 }),
     location: varchar("location", { length: 160 }),

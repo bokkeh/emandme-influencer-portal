@@ -3,11 +3,13 @@ import { NextResponse } from "next/server";
 import { db, influencerRoster, influencerRosterActivities, users } from "@/lib/db";
 import { desc, eq } from "drizzle-orm";
 import {
+  CREATOR_TYPES,
   INFLUENCER_TIERS,
   ROSTER_PLATFORMS,
   ROSTER_STATUSES,
   STRIPE_PAYOUT_STATUSES,
   type InfluencerTier,
+  type CreatorType,
   type RosterPlatform,
   type RosterStatus,
   type StripePayoutStatus,
@@ -40,6 +42,7 @@ function isMissingOptionalColumnError(error: unknown) {
     lowered.includes("avatar_url") ||
     lowered.includes("portfolio_url") ||
     lowered.includes("influencer_tier") ||
+    lowered.includes("creator_type") ||
     lowered.includes("total_revenue_generated") ||
     lowered.includes("total_campaigns") ||
     lowered.includes("stripe_payout_status") ||
@@ -87,6 +90,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const platform = asText(body.platform)?.toLowerCase() as RosterPlatform | null;
   const status = asText(body.status)?.toLowerCase().replace(" ", "_") as RosterStatus | null;
   const influencerTier = asText(body.influencerTier)?.toLowerCase() as InfluencerTier | null;
+  const creatorType = asText(body.creatorType)?.toLowerCase() as CreatorType | null;
   const stripePayoutStatus = asText(body.stripePayoutStatus)?.toLowerCase() as StripePayoutStatus | null;
   const tags = asTags(body.tags);
   const [adminUser] = await db
@@ -124,6 +128,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       email: body.email !== undefined ? asText(body.email) : undefined,
       phone: body.phone !== undefined ? asText(body.phone) : undefined,
       manager: body.manager !== undefined ? asText(body.manager) : undefined,
+      creatorType:
+        body.creatorType !== undefined
+          ? creatorType && CREATOR_TYPES.includes(creatorType)
+            ? creatorType
+            : undefined
+          : undefined,
       influencerTier:
         body.influencerTier !== undefined
           ? influencerTier && INFLUENCER_TIERS.includes(influencerTier)

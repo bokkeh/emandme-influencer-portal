@@ -36,10 +36,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
+  CREATOR_TYPES,
   INFLUENCER_TIERS,
   ROSTER_PLATFORMS,
   ROSTER_STATUSES,
   STRIPE_PAYOUT_STATUSES,
+  type CreatorType,
   type InfluencerTier,
   type InfluencerProfile,
   type RosterActivity,
@@ -89,6 +91,7 @@ type RosterForm = {
   email: string;
   phone: string;
   manager: string;
+  creatorType: CreatorType;
   influencerTier: InfluencerTier;
   niche: string;
   location: string;
@@ -136,6 +139,7 @@ const DEFAULT_FORM: RosterForm = {
   email: "",
   phone: "",
   manager: "",
+  creatorType: "influencer",
   influencerTier: "nano",
   niche: "",
   location: "",
@@ -271,6 +275,7 @@ function toForm(profile?: InfluencerProfile | null): RosterForm {
     email: profile.email ?? "",
     phone: profile.phone ?? "",
     manager: profile.manager ?? "",
+    creatorType: profile.creatorType ?? "influencer",
     influencerTier: profile.influencerTier,
     niche: profile.niche ?? "",
     location: profile.location ?? "",
@@ -304,6 +309,7 @@ function serializeForm(form: RosterForm) {
     email: form.email || null,
     phone: form.phone || null,
     manager: form.manager || null,
+    creatorType: form.creatorType,
     influencerTier: form.influencerTier,
     niche: form.niche || null,
     location: form.location || null,
@@ -803,6 +809,7 @@ export function RosterClient({
       "engagement_rate",
       "email",
       "manager",
+      "creator_type",
       "influencer_tier",
       "status",
       "total_revenue_generated",
@@ -829,6 +836,7 @@ export function RosterClient({
           row.engagementRate,
           row.email,
           row.manager,
+          row.creatorType,
           row.influencerTier,
           row.status,
           row.totalRevenueGenerated,
@@ -878,6 +886,7 @@ export function RosterClient({
           avatarUrl: row.avatar_url || null,
           email: row.email,
           manager: row.manager || row.agency,
+          creatorType: (row.creator_type || row.creator || "influencer").toLowerCase(),
           influencerTier: (row.influencer_tier || row.tier || "nano").toLowerCase(),
           niche: row.niche || row.category,
           location: row.location,
@@ -1143,6 +1152,7 @@ export function RosterClient({
                         Platform {sortIndicator("platform")}
                       </button>
                     </TableHead>
+                    <TableHead>Creator Type</TableHead>
                     <TableHead>Profile URL</TableHead>
                     <TableHead>Portfolio</TableHead>
                     <TableHead>
@@ -1289,6 +1299,11 @@ export function RosterClient({
                             {titleCase(row.platform)}
                           </button>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[11px]">
+                          {row.creatorType === "ugc_creator" ? "UGC Creator" : "Influencer"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {(() => {
@@ -1716,6 +1731,24 @@ export function RosterClient({
                 <div>
                   <Label>Social Handle</Label>
                   <Input value={form.handle} onChange={(e) => setForm((prev) => ({ ...prev, handle: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Creator Type</Label>
+                  <Select
+                    value={form.creatorType}
+                    onValueChange={(value) => setForm((prev) => ({ ...prev, creatorType: value as CreatorType }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CREATOR_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type === "ugc_creator" ? "UGC Creator" : "Influencer"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Avatar URL</Label>

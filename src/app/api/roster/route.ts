@@ -3,11 +3,13 @@ import { NextResponse } from "next/server";
 import { db, influencerRoster, influencerRosterActivities, users } from "@/lib/db";
 import { eq, desc } from "drizzle-orm";
 import {
+  CREATOR_TYPES,
   INFLUENCER_TIERS,
   ROSTER_PLATFORMS,
   ROSTER_STATUSES,
   STRIPE_PAYOUT_STATUSES,
   type InfluencerTier,
+  type CreatorType,
   type RosterPlatform,
   type RosterStatus,
   type StripePayoutStatus,
@@ -40,6 +42,7 @@ function isMissingOptionalColumnError(error: unknown) {
     lowered.includes("avatar_url") ||
     lowered.includes("portfolio_url") ||
     lowered.includes("influencer_tier") ||
+    lowered.includes("creator_type") ||
     lowered.includes("total_revenue_generated") ||
     lowered.includes("total_campaigns") ||
     lowered.includes("stripe_payout_status") ||
@@ -101,6 +104,7 @@ export async function POST(req: Request) {
   const platform = asText(body.platform)?.toLowerCase() as RosterPlatform | null;
   const status = asText(body.status)?.toLowerCase().replace(" ", "_") as RosterStatus | null;
   const influencerTier = asText(body.influencerTier)?.toLowerCase() as InfluencerTier | null;
+  const creatorType = asText(body.creatorType)?.toLowerCase() as CreatorType | null;
   const stripePayoutStatus = asText(body.stripePayoutStatus)?.toLowerCase() as StripePayoutStatus | null;
   const engagementRate = asNumber(body.engagementRate);
   const totalRevenueGenerated = asNumber(body.totalRevenueGenerated);
@@ -123,6 +127,7 @@ export async function POST(req: Request) {
       email: asText(body.email),
       phone: asText(body.phone),
       manager: asText(body.manager),
+      creatorType: creatorType && CREATOR_TYPES.includes(creatorType) ? creatorType : "influencer",
       influencerTier: influencerTier && INFLUENCER_TIERS.includes(influencerTier) ? influencerTier : "nano",
       niche: asText(body.niche),
       location: asText(body.location),

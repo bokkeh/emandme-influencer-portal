@@ -18,6 +18,7 @@ export const ROSTER_STATUSES = [
 ] as const;
 
 export const INFLUENCER_TIERS = ["nano", "micro", "macro", "mega"] as const;
+export const CREATOR_TYPES = ["influencer", "ugc_creator"] as const;
 export const STRIPE_PAYOUT_STATUSES = [
   "not_connected",
   "pending",
@@ -29,6 +30,7 @@ export const STRIPE_PAYOUT_STATUSES = [
 export type RosterPlatform = (typeof ROSTER_PLATFORMS)[number];
 export type RosterStatus = (typeof ROSTER_STATUSES)[number];
 export type InfluencerTier = (typeof INFLUENCER_TIERS)[number];
+export type CreatorType = (typeof CREATOR_TYPES)[number];
 export type StripePayoutStatus = (typeof STRIPE_PAYOUT_STATUSES)[number];
 
 export type RosterHistoryItem = {
@@ -48,6 +50,7 @@ export type InfluencerProfile = {
   email: string | null;
   phone: string | null;
   manager: string | null;
+  creatorType: CreatorType;
   influencerTier: InfluencerTier;
   niche: string | null;
   location: string | null;

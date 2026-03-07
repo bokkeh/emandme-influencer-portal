@@ -16,7 +16,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformBadge } from "@/components/shared/PlatformBadge";
 import { CopyButton } from "@/components/shared/CopyButton";
 import { TierBadge } from "@/components/shared/TierBadge";
-import { ArrowLeft, Plus } from "lucide-react";
+import { CampaignEnrollmentManager } from "@/components/admin/CampaignEnrollmentManager";
+import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -147,10 +148,7 @@ export default async function CampaignDetailPage({
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Enrolled Influencers ({enrollments.length})</CardTitle>
-          <Button size="sm" className="bg-rose-600 hover:bg-rose-700 gap-2">
-            <Plus className="h-4 w-4" />
-            Enroll Influencer
-          </Button>
+          <CampaignEnrollmentManager campaignId={id} />
         </CardHeader>
         <CardContent className="p-0">
           {enrollments.length === 0 ? (
