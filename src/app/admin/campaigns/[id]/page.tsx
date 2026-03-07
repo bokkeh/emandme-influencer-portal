@@ -11,6 +11,7 @@ import { CampaignEnrollmentManager } from "@/components/admin/CampaignEnrollment
 import { CampaignBriefBuilder } from "@/components/admin/CampaignBriefBuilder";
 import { CampaignCostBenchmarksCard } from "@/components/admin/CampaignCostBenchmarksCard";
 import { CampaignEnrollmentPipelineTable } from "@/components/admin/CampaignEnrollmentPipelineTable";
+import { CampaignHeaderEditor } from "@/components/admin/CampaignHeaderEditor";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
@@ -136,10 +137,15 @@ export default async function CampaignDetailPage({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold text-gray-900">{campaign.title}</h1>
+                <div className="flex-1 min-w-[260px]">
+                  <CampaignHeaderEditor
+                    campaignId={id}
+                    initialTitle={campaign.title}
+                    initialDescription={campaign.description ?? ""}
+                  />
+                </div>
                 <StatusBadge status={campaign.status} />
               </div>
-              {campaign.description ? <p className="mt-2 text-gray-600">{campaign.description}</p> : null}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {campaign.platforms.map((p) => (
                   <PlatformBadge key={p} platform={p} />

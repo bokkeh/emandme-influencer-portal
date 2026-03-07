@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Bold, Italic, Link2, List, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,97 @@ function buildShareUrl(appUrl: string | null | undefined, token: string | null |
   return `${base.replace(/\/$/, "")}/brief/${token}`;
 }
 
+function RichTextEditor({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder: string;
+}) {
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    if (el.innerHTML !== value) el.innerHTML = value;
+  }, [value]);
+
+  function exec(command: string, valueArg?: string) {
+    editorRef.current?.focus();
+    document.execCommand(command, false, valueArg);
+    const html = editorRef.current?.innerHTML ?? "";
+    onChange(html === "<br>" ? "" : html);
+  }
+
+  const isEmpty = !value || value === "<br>" || value === "<p><br></p>";
+
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="mt-1 rounded-md border border-gray-200">
+        <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2">
+          <Button type="button" variant="outline" size="icon-xs" onClick={() => exec("bold")} title="Bold">
+            <Bold className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" variant="outline" size="icon-xs" onClick={() => exec("italic")} title="Italic">
+            <Italic className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            onClick={() => exec("insertUnorderedList")}
+            title="Bullet list"
+          >
+            <List className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            onClick={() => exec("insertOrderedList")}
+            title="Numbered list"
+          >
+            <ListOrdered className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            onClick={() => {
+              const href = window.prompt("Enter URL");
+              if (!href) return;
+              exec("createLink", href);
+            }}
+            title="Insert link"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div className="relative">
+          {isEmpty && !isFocused ? (
+            <p className="pointer-events-none absolute left-3 top-2 text-sm text-gray-400">{placeholder}</p>
+          ) : null}
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onInput={(e) => onChange((e.currentTarget as HTMLDivElement).innerHTML)}
+            className="min-h-[110px] p-3 text-sm text-gray-900 focus:outline-none [&_a]:text-rose-600 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CampaignBriefBuilder({
   campaignId,
   initialBrief,
@@ -193,30 +285,30 @@ export function CampaignBriefBuilder({
 
         <div>
           <Label>Internal Brief Notes</Label>
-          <Textarea
-            rows={5}
-            value={brief}
-            onChange={(e) => setBrief(e.target.value)}
-            placeholder="Internal notes for your team."
-          />
+          <div className="mt-1 rounded-md border border-gray-200 p-2">
+            <Textarea
+              rows={4}
+              value={brief}
+              onChange={(e) => setBrief(e.target.value)}
+              placeholder="Internal notes for your team."
+            />
+          </div>
         </div>
 
         <div className="space-y-4">
           {SECTION_DEFS.map((section) => (
-            <div key={section.key}>
-              <Label>{section.label}</Label>
-              <Textarea
-                rows={4}
-                value={briefContent[section.key] ?? ""}
-                onChange={(e) =>
-                  setBriefContent((prev) => ({
-                    ...prev,
-                    [section.key]: e.target.value,
-                  }))
-                }
-                placeholder={section.placeholder}
-              />
-            </div>
+            <RichTextEditor
+              key={section.key}
+              label={section.label}
+              value={briefContent[section.key] ?? ""}
+              onChange={(next) =>
+                setBriefContent((prev) => ({
+                  ...prev,
+                  [section.key]: next,
+                }))
+              }
+              placeholder={section.placeholder}
+            />
           ))}
         </div>
 
