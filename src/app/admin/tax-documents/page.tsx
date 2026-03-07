@@ -30,14 +30,44 @@ type TaxDoc = {
   updatedAt: string;
 };
 
+type TaxPayerSettings = {
+  tax_payer_name: string;
+  tax_payer_tin: string;
+  tax_payer_address_line1: string;
+  tax_payer_address_line2: string;
+  tax_payer_city: string;
+  tax_payer_state: string;
+  tax_payer_postal_code: string;
+  tax_payer_country: string;
+};
+
+const DEFAULT_TAX_PAYER_SETTINGS: TaxPayerSettings = {
+  tax_payer_name: "",
+  tax_payer_tin: "",
+  tax_payer_address_line1: "",
+  tax_payer_address_line2: "",
+  tax_payer_city: "",
+  tax_payer_state: "",
+  tax_payer_postal_code: "",
+  tax_payer_country: "US",
+};
+
 export default function AdminTaxDocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [generatingOne, setGeneratingOne] = useState(false);
+  const [generatingAll, setGeneratingAll] = useState(false);
+  const [savingPayer, setSavingPayer] = useState(false);
   const [profiles, setProfiles] = useState<AdminProfile[]>([]);
   const [docs, setDocs] = useState<TaxDoc[]>([]);
+  const [payer, setPayer] = useState<TaxPayerSettings>(DEFAULT_TAX_PAYER_SETTINGS);
   const [influencerProfileId, setInfluencerProfileId] = useState("");
   const [taxYear, setTaxYear] = useState(String(new Date().getFullYear() - 1));
   const [file, setFile] = useState<File | null>(null);
+  const [lastGenerationSummary, setLastGenerationSummary] = useState<{
+    generatedCount: number;
+    skippedCount: number;
+  } | null>(null);
 
   const profileMap = useMemo(() => {
     return new Map(
@@ -53,11 +83,17 @@ export default function AdminTaxDocumentsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/tax-documents");
-      if (!res.ok) throw new Error((await res.text()) || "Failed to load tax documents");
-      const data = (await res.json()) as { profiles: AdminProfile[]; docs: TaxDoc[] };
+      const [docsRes, settingsRes] = await Promise.all([
+        fetch("/api/admin/tax-documents"),
+        fetch("/api/admin/tax-settings"),
+      ]);
+      if (!docsRes.ok) throw new Error((await docsRes.text()) || "Failed to load tax documents");
+      if (!settingsRes.ok) throw new Error((await settingsRes.text()) || "Failed to load tax settings");
+      const data = (await docsRes.json()) as { profiles: AdminProfile[]; docs: TaxDoc[] };
+      const settings = (await settingsRes.json()) as TaxPayerSettings;
       setProfiles(data.profiles);
       setDocs(data.docs);
+      setPayer({ ...DEFAULT_TAX_PAYER_SETTINGS, ...settings });
       if (!influencerProfileId && data.profiles[0]) setInfluencerProfileId(data.profiles[0].id);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load tax documents";
@@ -120,6 +156,57 @@ export default function AdminTaxDocumentsPage() {
     }
   }
 
+  async function savePayerSettings() {
+    setSavingPayer(true);
+    try {
+      const res = await fetch("/api/admin/tax-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payer),
+      });
+      if (!res.ok) throw new Error((await res.text()) || "Failed to save payer settings");
+      toast.success("Payer tax settings saved");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save payer settings";
+      toast.error(message);
+    } finally {
+      setSavingPayer(false);
+    }
+  }
+
+  async function generate1099(generateAll: boolean) {
+    if (!generateAll && !influencerProfileId) {
+      toast.error("Select an influencer first");
+      return;
+    }
+    const setLoadingState = generateAll ? setGeneratingAll : setGeneratingOne;
+    setLoadingState(true);
+    try {
+      const res = await fetch("/api/admin/tax-documents/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taxYear: Number(taxYear),
+          influencerProfileId: generateAll ? null : influencerProfileId,
+          generateAll,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.text()) || "Failed to generate 1099");
+      const data = (await res.json()) as { generatedCount: number; skippedCount: number };
+      setLastGenerationSummary({
+        generatedCount: data.generatedCount,
+        skippedCount: data.skippedCount,
+      });
+      toast.success(`Generated ${data.generatedCount} document(s), skipped ${data.skippedCount}`);
+      await loadData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate 1099";
+      toast.error(message);
+    } finally {
+      setLoadingState(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -142,6 +229,77 @@ export default function AdminTaxDocumentsPage() {
           <a href={`/api/admin/tax-documents/export?year=${encodeURIComponent(taxYear)}&format=pdf`}>
             <Button variant="outline">Download PDF</Button>
           </a>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Payer Company Fields (for 1099 layout)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <Label>Payer Legal Name</Label>
+              <Input
+                value={payer.tax_payer_name}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Payer TIN / EIN</Label>
+              <Input
+                value={payer.tax_payer_tin}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_tin: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Address Line 1</Label>
+              <Input
+                value={payer.tax_payer_address_line1}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_address_line1: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Address Line 2</Label>
+              <Input
+                value={payer.tax_payer_address_line2}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_address_line2: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>City</Label>
+              <Input
+                value={payer.tax_payer_city}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_city: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>State</Label>
+              <Input
+                value={payer.tax_payer_state}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_state: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Postal Code</Label>
+              <Input
+                value={payer.tax_payer_postal_code}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_postal_code: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Country</Label>
+              <Input
+                value={payer.tax_payer_country}
+                onChange={(e) => setPayer((prev) => ({ ...prev, tax_payer_country: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => void savePayerSettings()} disabled={savingPayer}>
+              {savingPayer ? "Saving..." : "Save Payer Fields"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -185,6 +343,34 @@ export default function AdminTaxDocumentsPage() {
             <Button className="bg-rose-600 hover:bg-rose-700" onClick={uploadTaxDoc} disabled={uploading}>
               {uploading ? "Uploading..." : "Upload 1099"}
             </Button>
+          </div>
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm font-medium text-gray-900">Auto-generate from tax profile + paid amounts</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Generates a draft 1099 summary PDF from stored tax details and paid payouts for the selected year.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void generate1099(false)}
+                disabled={generatingOne}
+              >
+                {generatingOne ? "Generating..." : "Generate for selected profile"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void generate1099(true)}
+                disabled={generatingAll}
+              >
+                {generatingAll ? "Generating..." : "Generate for all profiles"}
+              </Button>
+            </div>
+            {lastGenerationSummary ? (
+              <p className="mt-2 text-xs text-gray-600">
+                Last run: generated {lastGenerationSummary.generatedCount}, skipped{" "}
+                {lastGenerationSummary.skippedCount}.
+              </p>
+            ) : null}
           </div>
         </CardContent>
       </Card>
