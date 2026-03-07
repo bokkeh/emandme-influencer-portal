@@ -48,6 +48,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       description?: string | null;
       briefUrl?: string | null;
       briefContent?: CampaignBriefContent | null;
+      products?: Array<{
+        shopifyProductId: string;
+        title: string;
+        imageUrl?: string;
+        variantId?: string;
+      }> | null;
       status?: "draft" | "active" | "paused" | "completed" | "cancelled";
       totalBudget?: number | string | null;
       startDate?: string | null;
@@ -71,6 +77,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       description: body.description !== undefined ? (body.description?.trim() || null) : undefined,
       briefUrl: body.briefUrl !== undefined ? (body.briefUrl?.trim() || null) : undefined,
       briefContent: body.briefContent !== undefined ? body.briefContent ?? {} : undefined,
+      products: body.products !== undefined ? body.products ?? [] : undefined,
       briefShareToken,
       status: body.status,
       totalBudget:

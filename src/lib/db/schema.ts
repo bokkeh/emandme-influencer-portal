@@ -446,6 +446,12 @@ export const campaignInfluencers = pgTable(
 
     deliverables: jsonb("deliverables").$type<Deliverable[]>().default([]),
     notes: text("notes"),
+    petName: varchar("pet_name", { length: 120 }),
+    petBreed: varchar("pet_breed", { length: 120 }),
+    petAge: varchar("pet_age", { length: 40 }),
+    petPersonality: text("pet_personality"),
+    tagPersonalizationText: text("tag_personalization_text"),
+    petInfoSubmittedAt: timestamp("pet_info_submitted_at", { withTimezone: true }),
 
     enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

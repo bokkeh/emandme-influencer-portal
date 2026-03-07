@@ -8,6 +8,9 @@ import {
   campaigns,
   utmLinks,
   discountCodes,
+  assets,
+  shipments,
+  payments,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +18,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformBadge } from "@/components/shared/PlatformBadge";
 import { CopyButton } from "@/components/shared/CopyButton";
 import { Button } from "@/components/ui/button";
+import { CampaignProgressCard } from "@/components/influencer/CampaignProgressCard";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
@@ -53,6 +57,11 @@ export default async function InfluencerCampaignDetailPage({
       deliverables: campaignInfluencers.deliverables,
       utmLinkId: campaignInfluencers.utmLinkId,
       discountCodeId: campaignInfluencers.discountCodeId,
+      petName: campaignInfluencers.petName,
+      petBreed: campaignInfluencers.petBreed,
+      petAge: campaignInfluencers.petAge,
+      petPersonality: campaignInfluencers.petPersonality,
+      tagPersonalizationText: campaignInfluencers.tagPersonalizationText,
       campaignTitle: campaigns.title,
       campaignDescription: campaigns.description,
       campaignStatus: campaigns.status,
@@ -82,6 +91,58 @@ export default async function InfluencerCampaignDetailPage({
       ? db.select().from(discountCodes).where(eq(discountCodes.id, enrollment.discountCodeId)).limit(1)
       : Promise.resolve([]),
   ]);
+
+  const [shipment, submittedAsset, publishedAsset, paidPayment] = await Promise.all([
+    db
+      .select({ id: shipments.id })
+      .from(shipments)
+      .where(and(eq(shipments.campaignId, id), eq(shipments.influencerProfileId, profile.id)))
+      .limit(1),
+    db
+      .select({ id: assets.id })
+      .from(assets)
+      .where(and(eq(assets.campaignId, id), eq(assets.influencerProfileId, profile.id)))
+      .limit(1),
+    db
+      .select({ id: assets.id })
+      .from(assets)
+      .where(
+        and(
+          eq(assets.campaignId, id),
+          eq(assets.influencerProfileId, profile.id),
+          eq(assets.status, "approved")
+        )
+      )
+      .limit(1),
+    db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.campaignId, id),
+          eq(payments.influencerProfileId, profile.id),
+          eq(payments.status, "paid")
+        )
+      )
+      .limit(1),
+  ]);
+
+  const petInfoSubmitted = Boolean(
+    enrollment.petName &&
+      enrollment.petBreed &&
+      enrollment.petAge &&
+      enrollment.petPersonality &&
+      enrollment.tagPersonalizationText
+  );
+  const joinedCampaign = ["accepted", "active", "completed"].includes(enrollment.status);
+  const checklist = [
+    { label: "Joined campaign", done: joinedCampaign },
+    { label: "Submitted pet tag info", done: petInfoSubmitted },
+    { label: "Product shipped", done: Boolean(shipment[0]) },
+    { label: "Content submitted for approval", done: Boolean(submittedAsset[0]) },
+    { label: "Post published", done: Boolean(publishedAsset[0]) },
+    { label: "Payment sent", done: Boolean(paidPayment[0]) },
+  ];
 
   const utmLink = myUTMLink[0] ?? null;
   const discountCode = myDiscountCode[0] ?? null;
@@ -183,6 +244,19 @@ export default async function InfluencerCampaignDetailPage({
           </CardContent>
         </Card>
       )}
+
+      <CampaignProgressCard
+        campaignId={id}
+        canSubmitPetInfo={joinedCampaign}
+        checklist={checklist}
+        initialPetInfo={{
+          petName: enrollment.petName ?? "",
+          petBreed: enrollment.petBreed ?? "",
+          petAge: enrollment.petAge ?? "",
+          petPersonality: enrollment.petPersonality ?? "",
+          tagPersonalizationText: enrollment.tagPersonalizationText ?? "",
+        }}
+      />
 
       {/* UTM Link & Discount Code */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

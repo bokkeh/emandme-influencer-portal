@@ -21,6 +21,7 @@ import { CampaignCostBenchmarksCard } from "@/components/admin/CampaignCostBench
 import { CampaignLaunchChecklistCard } from "@/components/admin/CampaignLaunchChecklistCard";
 import { CampaignEnrollmentPipelineTable } from "@/components/admin/CampaignEnrollmentPipelineTable";
 import { CampaignHeaderEditor } from "@/components/admin/CampaignHeaderEditor";
+import { CampaignProductSelector } from "@/components/admin/CampaignProductSelector";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
@@ -41,16 +42,31 @@ function isCampaignSchemaError(error: unknown) {
 
 export default async function CampaignDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  const tab = (await searchParams).tab;
+  const activeTab = tab === "enrolled" || tab === "content" ? tab : "brief";
 
   let schemaError: string | null = null;
   let campaign: (typeof campaigns.$inferSelect) | null = null;
   let hasShippedProduct = false;
   let hasReviewedContent = false;
   let hasTrackedMetrics = false;
+  let campaignAssets: Array<{
+    id: string;
+    blobUrl: string;
+    thumbnailUrl: string | null;
+    fileType: string;
+    title: string | null;
+    status: "pending_review" | "approved" | "rejected" | "revision_requested";
+    createdAt: Date;
+    influencerName: string | null;
+    userEmail: string;
+  }> = [];
   let enrollments: Array<{
     id: string;
     status: "invited" | "accepted" | "declined" | "active" | "completed" | "removed";
@@ -119,6 +135,23 @@ export default async function CampaignDetailPage({
         .where(eq(performanceSnapshots.campaignId, id))
         .limit(1);
       hasTrackedMetrics = Boolean(snapshot);
+
+      campaignAssets = await db
+        .select({
+          id: assets.id,
+          blobUrl: assets.blobUrl,
+          thumbnailUrl: assets.thumbnailUrl,
+          fileType: assets.fileType,
+          title: assets.title,
+          status: assets.status,
+          createdAt: assets.createdAt,
+          influencerName: influencerProfiles.displayName,
+          userEmail: users.email,
+        })
+        .from(assets)
+        .innerJoin(influencerProfiles, eq(assets.influencerProfileId, influencerProfiles.id))
+        .innerJoin(users, eq(influencerProfiles.userId, users.id))
+        .where(eq(assets.campaignId, id));
     }
   } catch (error) {
     if (isCampaignSchemaError(error)) {
@@ -157,7 +190,19 @@ export default async function CampaignDetailPage({
 
   if (!campaign) notFound();
 
-  const products = (campaign.products as Array<{ title: string; imageUrl?: string }>) ?? [];
+  const products =
+    ((campaign.products as Array<{
+      shopifyProductId?: string;
+      title: string;
+      imageUrl?: string;
+      variantId?: string;
+    }>) ?? []
+    ).map((product, index) => ({
+      shopifyProductId: product.shopifyProductId ?? `manual-${index}-${product.title}`,
+      title: product.title,
+      imageUrl: product.imageUrl,
+      variantId: product.variantId,
+    }));
   const briefContent = (campaign.briefContent ?? {}) as Record<string, string | undefined>;
   const hasBriefContent =
     Boolean(campaign.briefUrl?.trim()) ||
@@ -263,51 +308,103 @@ export default async function CampaignDetailPage({
         </CardContent>
       </Card>
 
-      {products.length > 0 ? (
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/admin/campaigns/${id}?tab=brief`}>
+          <Button variant={activeTab === "brief" ? "default" : "outline"} size="sm">
+            Brief
+          </Button>
+        </Link>
+        <Link href={`/admin/campaigns/${id}?tab=enrolled`}>
+          <Button variant={activeTab === "enrolled" ? "default" : "outline"} size="sm">
+            Enrolled Influencers
+          </Button>
+        </Link>
+        <Link href={`/admin/campaigns/${id}?tab=content`}>
+          <Button variant={activeTab === "content" ? "default" : "outline"} size="sm">
+            Content Library
+          </Button>
+        </Link>
+      </div>
+
+      {activeTab === "brief" ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CampaignBriefBuilder
+            campaignId={id}
+            initialBrief={campaign.description ?? ""}
+            initialBriefUrl={campaign.briefUrl ?? ""}
+            initialBriefContent={campaign.briefContent ?? {}}
+            initialBriefShareToken={campaign.briefShareToken ?? null}
+            appUrl={process.env.NEXT_PUBLIC_APP_URL ?? null}
+          />
+          <div className="space-y-4">
+            <CampaignProductSelector campaignId={id} initialProducts={products} />
+            <CampaignLaunchChecklistCard items={launchChecklistItems} />
+            <CampaignCostBenchmarksCard />
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "enrolled" ? (
         <Card className="border border-gray-200 shadow-sm">
-          <CardContent className="p-6">
-            <p className="text-sm font-semibold text-gray-900 mb-3">Products</p>
-            <div className="flex flex-wrap gap-4">
-              {products.map((p, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-2">
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.imageUrl} alt={p.title} className="h-10 w-10 rounded object-cover" />
-                  ) : null}
-                  <p className="text-sm font-medium text-gray-900">{p.title}</p>
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center justify-between p-6 pb-3">
+            <p className="text-base font-semibold text-gray-900">
+              Enrolled Influencers ({enrollments.length})
+            </p>
+            <CampaignEnrollmentManager campaignId={id} />
+          </div>
+          <CardContent className="p-0">
+            <CampaignEnrollmentPipelineTable campaignId={id} rows={enrollments} />
           </CardContent>
         </Card>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <CampaignBriefBuilder
-          campaignId={id}
-          initialBrief={campaign.description ?? ""}
-          initialBriefUrl={campaign.briefUrl ?? ""}
-          initialBriefContent={campaign.briefContent ?? {}}
-          initialBriefShareToken={campaign.briefShareToken ?? null}
-          appUrl={process.env.NEXT_PUBLIC_APP_URL ?? null}
-        />
-        <div className="space-y-4">
-          <CampaignLaunchChecklistCard items={launchChecklistItems} />
-          <CampaignCostBenchmarksCard />
-        </div>
-      </div>
-
-      <Card className="border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between p-6 pb-3">
-          <p className="text-base font-semibold text-gray-900">
-            Enrolled Influencers ({enrollments.length})
-          </p>
-          <CampaignEnrollmentManager campaignId={id} />
-        </div>
-        <CardContent className="p-0">
-          <CampaignEnrollmentPipelineTable campaignId={id} rows={enrollments} />
-        </CardContent>
-      </Card>
+      {activeTab === "content" ? (
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="p-6">
+            <p className="mb-3 text-base font-semibold text-gray-900">Campaign Content Library ({campaignAssets.length})</p>
+            {campaignAssets.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No assets uploaded for this campaign yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {campaignAssets.map((asset) => (
+                  <div key={asset.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                    <div className="bg-gray-100">
+                      {asset.thumbnailUrl ? (
+                        <img
+                          src={asset.thumbnailUrl}
+                          alt={asset.title ?? "Asset"}
+                          className="h-36 w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-36 items-center justify-center text-sm text-gray-400">
+                          {asset.fileType === "video" ? "Video" : "Image"}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1 p-3">
+                      <p className="truncate text-sm font-medium text-gray-900">{asset.title ?? "Untitled"}</p>
+                      <p className="truncate text-xs text-gray-500">{asset.influencerName ?? asset.userEmail}</p>
+                      <div className="flex items-center justify-between">
+                        <StatusBadge status={asset.status} />
+                        <a
+                          href={asset.blobUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-rose-600 underline"
+                        >
+                          Open
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
