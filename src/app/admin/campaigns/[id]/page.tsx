@@ -1,8 +1,16 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { campaigns, campaignInfluencers, influencerProfiles, users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  campaigns,
+  campaignInfluencers,
+  influencerProfiles,
+  users,
+  assets,
+  shipments,
+  performanceSnapshots,
+} from "@/lib/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -10,6 +18,7 @@ import { PlatformBadge } from "@/components/shared/PlatformBadge";
 import { CampaignEnrollmentManager } from "@/components/admin/CampaignEnrollmentManager";
 import { CampaignBriefBuilder } from "@/components/admin/CampaignBriefBuilder";
 import { CampaignCostBenchmarksCard } from "@/components/admin/CampaignCostBenchmarksCard";
+import { CampaignLaunchChecklistCard } from "@/components/admin/CampaignLaunchChecklistCard";
 import { CampaignEnrollmentPipelineTable } from "@/components/admin/CampaignEnrollmentPipelineTable";
 import { CampaignHeaderEditor } from "@/components/admin/CampaignHeaderEditor";
 import { ArrowLeft } from "lucide-react";
@@ -39,6 +48,9 @@ export default async function CampaignDetailPage({
 
   let schemaError: string | null = null;
   let campaign: (typeof campaigns.$inferSelect) | null = null;
+  let hasShippedProduct = false;
+  let hasReviewedContent = false;
+  let hasTrackedMetrics = false;
   let enrollments: Array<{
     id: string;
     status: "invited" | "accepted" | "declined" | "active" | "completed" | "removed";
@@ -81,6 +93,32 @@ export default async function CampaignDetailPage({
         .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
         .innerJoin(users, eq(influencerProfiles.userId, users.id))
         .where(eq(campaignInfluencers.campaignId, id));
+
+      const [shipment] = await db
+        .select({ id: shipments.id })
+        .from(shipments)
+        .where(eq(shipments.campaignId, id))
+        .limit(1);
+      hasShippedProduct = Boolean(shipment);
+
+      const [reviewedAsset] = await db
+        .select({ id: assets.id })
+        .from(assets)
+        .where(
+          and(
+            eq(assets.campaignId, id),
+            inArray(assets.status, ["approved", "rejected", "revision_requested"])
+          )
+        )
+        .limit(1);
+      hasReviewedContent = Boolean(reviewedAsset);
+
+      const [snapshot] = await db
+        .select({ id: performanceSnapshots.id })
+        .from(performanceSnapshots)
+        .where(eq(performanceSnapshots.campaignId, id))
+        .limit(1);
+      hasTrackedMetrics = Boolean(snapshot);
     }
   } catch (error) {
     if (isCampaignSchemaError(error)) {
@@ -120,6 +158,46 @@ export default async function CampaignDetailPage({
   if (!campaign) notFound();
 
   const products = (campaign.products as Array<{ title: string; imageUrl?: string }>) ?? [];
+  const briefContent = (campaign.briefContent ?? {}) as Record<string, string | undefined>;
+  const hasBriefContent =
+    Boolean(campaign.briefUrl?.trim()) ||
+    Boolean(campaign.description?.trim()) ||
+    Object.values(briefContent).some((value) =>
+      typeof value === "string" ? value.replace(/<[^>]*>/g, "").trim().length > 0 : false
+    );
+
+  const launchChecklistItems = [
+    {
+      label: "Create brief",
+      done: hasBriefContent,
+      description: "Complete key sections in the campaign brief.",
+    },
+    {
+      label: "Enroll influencers",
+      done: enrollments.length > 0,
+      description: "Add at least one influencer from your roster.",
+    },
+    {
+      label: "Ship product",
+      done: hasShippedProduct,
+      description: "Create at least one shipment tied to this campaign.",
+    },
+    {
+      label: "Review content",
+      done: hasReviewedContent,
+      description: "Mark at least one submitted asset as reviewed.",
+    },
+    {
+      label: "Track metrics",
+      done: hasTrackedMetrics,
+      description: "Capture at least one performance snapshot.",
+    },
+    {
+      label: "Go live",
+      done: campaign.status === "active",
+      description: "Set campaign status to Active when ready.",
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -213,7 +291,10 @@ export default async function CampaignDetailPage({
           initialBriefShareToken={campaign.briefShareToken ?? null}
           appUrl={process.env.NEXT_PUBLIC_APP_URL ?? null}
         />
-        <CampaignCostBenchmarksCard />
+        <div className="space-y-4">
+          <CampaignLaunchChecklistCard items={launchChecklistItems} />
+          <CampaignCostBenchmarksCard />
+        </div>
       </div>
 
       <Card className="border border-gray-200 shadow-sm">
