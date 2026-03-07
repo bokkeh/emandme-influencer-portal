@@ -356,6 +356,8 @@ type CampaignProduct = {
 };
 
 type CampaignBriefContent = {
+  contentLibraryMedia?: Array<{ url: string; fileType: "image" | "video"; name?: string }>;
+  copySnippets?: string[];
   heroImageUrl?: string;
   campaignOverview?: string;
   brandIntroduction?: string;

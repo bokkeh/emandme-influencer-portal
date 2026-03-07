@@ -22,6 +22,7 @@ import { CampaignLaunchChecklistCard } from "@/components/admin/CampaignLaunchCh
 import { CampaignEnrollmentPipelineTable } from "@/components/admin/CampaignEnrollmentPipelineTable";
 import { CampaignHeaderEditor } from "@/components/admin/CampaignHeaderEditor";
 import { CampaignProductSelector } from "@/components/admin/CampaignProductSelector";
+import { CampaignContentLibraryManager } from "@/components/admin/CampaignContentLibraryManager";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
@@ -265,9 +266,13 @@ export default async function CampaignDetailPage({
                     campaignId={id}
                     initialTitle={campaign.title}
                     initialDescription={campaign.description ?? ""}
+                    initialPlatforms={campaign.platforms}
+                    initialTotalBudget={campaign.totalBudget}
+                    initialStartDate={campaign.startDate}
+                    initialEndDate={campaign.endDate}
                   />
                 </div>
-                <StatusBadge status={campaign.status} />
+                {campaign.status !== "draft" ? <StatusBadge status={campaign.status} /> : null}
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {campaign.platforms.map((p) => (
@@ -359,51 +364,12 @@ export default async function CampaignDetailPage({
       ) : null}
 
       {activeTab === "content" ? (
-        <Card className="border border-gray-200 shadow-sm">
-          <CardContent className="p-6">
-            <p className="mb-3 text-base font-semibold text-gray-900">Campaign Content Library ({campaignAssets.length})</p>
-            {campaignAssets.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No assets uploaded for this campaign yet.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {campaignAssets.map((asset) => (
-                  <div key={asset.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                    <div className="bg-gray-100">
-                      {asset.thumbnailUrl ? (
-                        <img
-                          src={asset.thumbnailUrl}
-                          alt={asset.title ?? "Asset"}
-                          className="h-36 w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-36 items-center justify-center text-sm text-gray-400">
-                          {asset.fileType === "video" ? "Video" : "Image"}
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-1 p-3">
-                      <p className="truncate text-sm font-medium text-gray-900">{asset.title ?? "Untitled"}</p>
-                      <p className="truncate text-xs text-gray-500">{asset.influencerName ?? asset.userEmail}</p>
-                      <div className="flex items-center justify-between">
-                        <StatusBadge status={asset.status} />
-                        <a
-                          href={asset.blobUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-rose-600 underline"
-                        >
-                          Open
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <CampaignContentLibraryManager
+          campaignId={id}
+          selectedProducts={products}
+          campaignAssets={campaignAssets}
+          initialBriefContent={campaign.briefContent ?? {}}
+        />
       ) : null}
     </div>
   );

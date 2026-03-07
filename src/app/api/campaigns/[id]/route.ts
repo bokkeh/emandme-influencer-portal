@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { db, campaigns, users } from "@/lib/db";
 
 type CampaignBriefContent = {
+  contentLibraryMedia?: Array<{ url: string; fileType: "image" | "video"; name?: string }>;
+  copySnippets?: string[];
   heroImageUrl?: string;
   campaignOverview?: string;
   brandIntroduction?: string;
@@ -54,6 +56,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         imageUrl?: string;
         variantId?: string;
       }> | null;
+      platforms?: Array<"instagram" | "tiktok" | "youtube" | "pinterest" | "blog"> | null;
       status?: "draft" | "active" | "paused" | "completed" | "cancelled";
       totalBudget?: number | string | null;
       startDate?: string | null;
@@ -78,6 +81,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       briefUrl: body.briefUrl !== undefined ? (body.briefUrl?.trim() || null) : undefined,
       briefContent: body.briefContent !== undefined ? body.briefContent ?? {} : undefined,
       products: body.products !== undefined ? body.products ?? [] : undefined,
+      platforms: body.platforms !== undefined ? body.platforms ?? [] : undefined,
       briefShareToken,
       status: body.status,
       totalBudget:
