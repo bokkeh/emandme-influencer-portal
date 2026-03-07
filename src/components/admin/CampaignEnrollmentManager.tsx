@@ -16,6 +16,7 @@ type Candidate = {
   email: string;
   tier: string;
   avatarUrl: string | null;
+  source: "portal" | "roster";
   enrolled: boolean;
 };
 
@@ -29,7 +30,7 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [influencerProfileId, setInfluencerProfileId] = useState("");
+  const [candidateId, setCandidateId] = useState("");
   const [agreedFee, setAgreedFee] = useState("");
   const [contentDueDate, setContentDueDate] = useState("");
   const [notes, setNotes] = useState("");
@@ -57,7 +58,7 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
   async function onOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (nextOpen) {
-      setInfluencerProfileId("");
+      setCandidateId("");
       setAgreedFee("");
       setContentDueDate("");
       setNotes("");
@@ -66,7 +67,7 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
   }
 
   async function enroll() {
-    if (!influencerProfileId) {
+    if (!candidateId) {
       toast.error("Select an influencer to enroll");
       return;
     }
@@ -76,7 +77,7 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          influencerProfileId,
+          candidateId,
           agreedFee: agreedFee ? Number(agreedFee) : null,
           contentDueDate: contentDueDate || null,
           notes: notes || null,
@@ -116,14 +117,14 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
             <div className="space-y-3">
               <div>
                 <Label>Influencer</Label>
-                <Select value={influencerProfileId} onValueChange={setInfluencerProfileId}>
+                <Select value={candidateId} onValueChange={setCandidateId}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select influencer" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableCandidates.map((candidate) => (
                       <SelectItem key={candidate.id} value={candidate.id}>
-                        {candidate.name} ({candidate.email})
+                        {candidate.name} ({candidate.email}) {candidate.source === "roster" ? "- Roster" : "- Portal"}
                       </SelectItem>
                     ))}
                   </SelectContent>

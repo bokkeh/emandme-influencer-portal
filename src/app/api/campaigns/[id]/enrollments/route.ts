@@ -1,7 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { db, users, campaigns, influencerProfiles, campaignInfluencers } from "@/lib/db";
+import {
+  db,
+  users,
+  campaigns,
+  influencerProfiles,
+  campaignInfluencers,
+  influencerRoster,
+} from "@/lib/db";
 
 async function requireAdmin() {
   const { userId, sessionClaims } = await auth();
@@ -25,11 +32,97 @@ function isSchemaError(error: unknown) {
   return (
     lowered.includes("campaign_influencers") ||
     lowered.includes("influencer_profiles") ||
+    lowered.includes("influencer_roster") ||
     lowered.includes("enrollment_status") ||
     lowered.includes("does not exist") ||
     lowered.includes("undefined table") ||
     lowered.includes("undefined column")
   );
+}
+
+function parseName(fullName: string | null | undefined) {
+  const value = (fullName ?? "").trim();
+  if (!value) return { firstName: null as string | null, lastName: null as string | null };
+  const [first, ...rest] = value.split(/\s+/);
+  return {
+    firstName: first ?? null,
+    lastName: rest.length > 0 ? rest.join(" ") : null,
+  };
+}
+
+async function resolveProfileId(candidateId: string) {
+  if (candidateId.startsWith("profile:")) return candidateId.replace("profile:", "");
+  if (!candidateId.startsWith("roster:")) return null;
+
+  const rosterId = candidateId.replace("roster:", "");
+  const [roster] = await db
+    .select({
+      id: influencerRoster.id,
+      fullName: influencerRoster.fullName,
+      email: influencerRoster.email,
+      niche: influencerRoster.niche,
+      audienceNotes: influencerRoster.audienceNotes,
+      influencerTier: influencerRoster.influencerTier,
+      creatorType: influencerRoster.creatorType,
+      internalNotes: influencerRoster.internalNotes,
+    })
+    .from(influencerRoster)
+    .where(eq(influencerRoster.id, rosterId))
+    .limit(1);
+  if (!roster) return null;
+
+  const syntheticClerkUserId = `roster_${roster.id}`;
+  const fallbackEmail = `roster_${roster.id}@placeholder.local`;
+  const { firstName, lastName } = parseName(roster.fullName);
+
+  let userId: string | null = null;
+  if (roster.email) {
+    const [existingByEmail] = await db.select({ id: users.id }).from(users).where(eq(users.email, roster.email)).limit(1);
+    userId = existingByEmail?.id ?? null;
+  }
+  if (!userId) {
+    const [existingBySynthetic] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkUserId, syntheticClerkUserId))
+      .limit(1);
+    userId = existingBySynthetic?.id ?? null;
+  }
+  if (!userId) {
+    const [createdUser] = await db
+      .insert(users)
+      .values({
+        clerkUserId: syntheticClerkUserId,
+        email: roster.email ?? fallbackEmail,
+        firstName,
+        lastName,
+        role: roster.creatorType === "ugc_creator" ? "ugc_creator" : "influencer",
+      })
+      .returning({ id: users.id });
+    userId = createdUser?.id ?? null;
+  }
+  if (!userId) return null;
+
+  const [existingProfile] = await db
+    .select({ id: influencerProfiles.id })
+    .from(influencerProfiles)
+    .where(eq(influencerProfiles.userId, userId))
+    .limit(1);
+  if (existingProfile) return existingProfile.id;
+
+  const [createdProfile] = await db
+    .insert(influencerProfiles)
+    .values({
+      userId,
+      displayName: roster.fullName,
+      niche: roster.niche,
+      bio: roster.audienceNotes,
+      tier: roster.influencerTier,
+      notes: roster.internalNotes,
+    })
+    .returning({ id: influencerProfiles.id });
+
+  return createdProfile?.id ?? null;
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -62,8 +155,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .where(eq(campaignInfluencers.campaignId, id));
 
     const enrolledSet = new Set(enrolledRows.map((row) => row.influencerProfileId));
-    const candidates = rows.map((row) => ({
-      id: row.id,
+    const profileByEmail = new Map<string, string>();
+    for (const row of rows) {
+      if (row.email) profileByEmail.set(row.email.toLowerCase(), row.id);
+    }
+
+    const profileCandidates = rows.map((row) => ({
+      id: `profile:${row.id}`,
       name:
         row.displayName ||
         `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim() ||
@@ -71,8 +169,38 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       email: row.email,
       tier: row.tier,
       avatarUrl: row.avatarUrl,
+      source: "portal" as const,
       enrolled: enrolledSet.has(row.id),
     }));
+
+    const rosterRows = await db
+      .select({
+        id: influencerRoster.id,
+        fullName: influencerRoster.fullName,
+        email: influencerRoster.email,
+        influencerTier: influencerRoster.influencerTier,
+        avatarUrl: influencerRoster.avatarUrl,
+      })
+      .from(influencerRoster);
+
+    const rosterCandidates = rosterRows
+      .filter((row) => {
+        if (!row.email) return true;
+        return !profileByEmail.has(row.email.toLowerCase());
+      })
+      .map((row) => ({
+        id: `roster:${row.id}`,
+        name: row.fullName,
+        email: row.email ?? "No email",
+        tier: row.influencerTier,
+        avatarUrl: row.avatarUrl,
+        source: "roster" as const,
+        enrolled: row.email ? enrolledSet.has(profileByEmail.get(row.email.toLowerCase()) ?? "") : false,
+      }));
+
+    const candidates = [...profileCandidates, ...rosterCandidates].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
 
     return NextResponse.json(candidates);
   } catch (error) {
@@ -93,13 +221,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     const body = (await req.json()) as {
-      influencerProfileId?: string;
+      candidateId?: string;
       agreedFee?: number | string | null;
       contentDueDate?: string | null;
       notes?: string | null;
     };
 
-    if (!body.influencerProfileId) return new NextResponse("Influencer is required", { status: 400 });
+    if (!body.candidateId) return new NextResponse("Influencer is required", { status: 400 });
+    const influencerProfileId = await resolveProfileId(body.candidateId);
+    if (!influencerProfileId) return new NextResponse("Influencer profile could not be resolved", { status: 400 });
 
     const [existing] = await db
       .select({ id: campaignInfluencers.id })
@@ -107,7 +237,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .where(
         and(
           eq(campaignInfluencers.campaignId, id),
-          eq(campaignInfluencers.influencerProfileId, body.influencerProfileId)
+          eq(campaignInfluencers.influencerProfileId, influencerProfileId)
         )
       )
       .limit(1);
@@ -117,7 +247,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .insert(campaignInfluencers)
       .values({
         campaignId: id,
-        influencerProfileId: body.influencerProfileId,
+        influencerProfileId,
         status: "invited",
         agreedFee:
           body.agreedFee !== null && body.agreedFee !== undefined && body.agreedFee !== ""

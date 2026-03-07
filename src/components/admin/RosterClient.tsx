@@ -2054,9 +2054,21 @@ export function RosterClient({
       <Sheet open={Boolean(selectedId)} onOpenChange={(open) => !open && setSelectedId(null)}>
         <SheetContent className="sm:max-w-2xl overflow-y-auto">
           <SheetHeader className="border-b border-gray-100">
-            <SheetTitle>
-              {detail?.profile.fullName ?? (detailLoading ? "Loading..." : "Influencer Profile")}
-            </SheetTitle>
+            <div className="flex items-center justify-between gap-3">
+              <SheetTitle>
+                {detail?.profile.fullName ?? (detailLoading ? "Loading..." : "Influencer Profile")}
+              </SheetTitle>
+              {detail?.profile ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openEditDialog(detail.profile)}
+                  className="shrink-0"
+                >
+                  Edit
+                </Button>
+              ) : null}
+            </div>
           </SheetHeader>
 
           {detailLoading ? (
