@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,7 @@ import {
   Settings,
   FileText,
 } from "lucide-react";
+import { ViewModeToggle } from "@/components/shared/ViewModeToggle";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -33,12 +34,11 @@ const NAV_ITEMS = [
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ showViewToggle = false }: { showViewToggle?: boolean }) {
   const pathname = usePathname();
 
   return (
     <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
-      {/* Logo */}
       <div className="flex h-16 items-center border-b border-gray-200 px-6">
         <div>
           <p className="text-sm font-bold text-rose-600 leading-tight">Em & Me Studio</p>
@@ -46,7 +46,6 @@ export function AdminSidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-0.5 px-3">
           {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
@@ -71,9 +70,13 @@ export function AdminSidebar() {
         </ul>
       </nav>
 
-      {/* Footer */}
       <div className="border-t border-gray-200 p-4">
-        <p className="text-xs text-gray-400">© 2025 Em & Me Studio</p>
+        {showViewToggle ? (
+          <div className="mb-3">
+            <ViewModeToggle currentMode="admin" />
+          </div>
+        ) : null}
+        <p className="text-xs text-gray-400">© 2026 Em & Me Studio</p>
       </div>
     </aside>
   );

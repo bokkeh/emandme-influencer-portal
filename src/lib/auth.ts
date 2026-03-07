@@ -26,6 +26,21 @@ export async function requireAdmin() {
   return { userId, role: role as UserRole };
 }
 
+export function isEmailSuperAdmin(email: string | null | undefined) {
+  const normalized = (email ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  const configured = (process.env.SUPERADMIN_EMAILS ?? "")
+    .split(",")
+    .map((v) => v.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.includes(normalized);
+}
+
+export async function isSuperAdminByUserId(userId: string) {
+  const [dbUser] = await db.select({ email: users.email }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+  return isEmailSuperAdmin(dbUser?.email);
+}
+
 export async function requireInfluencer() {
   const { userId, sessionClaims } = await auth();
   if (!userId) redirect("/sign-in");
@@ -38,7 +53,11 @@ export async function requireInfluencer() {
   }
 
   if (role !== "influencer" && role !== "ugc_creator") {
-    if (role === "admin") redirect("/admin/dashboard");
+    if (role === "admin") {
+      const superAdmin = await isSuperAdminByUserId(userId);
+      if (!superAdmin) redirect("/admin/dashboard");
+      return { userId, role };
+    }
     else redirect("/onboarding");
   }
   return { userId, role };

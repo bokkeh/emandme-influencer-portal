@@ -213,6 +213,7 @@ export function CampaignBriefBuilder({
   const [briefUrl, setBriefUrl] = useState(initialBriefUrl);
   const [briefContent, setBriefContent] = useState<CampaignBriefContent>(initialBriefContent ?? {});
   const [briefShareToken, setBriefShareToken] = useState(initialBriefShareToken ?? "");
+  const [uploadingHero, setUploadingHero] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const shareUrl = buildShareUrl(appUrl, briefShareToken);
@@ -238,6 +239,27 @@ export function CampaignBriefBuilder({
       toast.error(message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadHeroImage(file: File) {
+    setUploadingHero(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error((await res.text()) || "Failed to upload image");
+      const data = (await res.json()) as { url: string };
+      setBriefContent((prev) => ({ ...prev, heroImageUrl: data.url }));
+      toast.success("Header image uploaded");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to upload image";
+      toast.error(message);
+    } finally {
+      setUploadingHero(false);
     }
   }
 
@@ -286,16 +308,33 @@ export function CampaignBriefBuilder({
 
         <div>
           <Label>Header Image URL (full-width image above logo/title)</Label>
-          <Input
-            value={briefContent.heroImageUrl ?? ""}
-            onChange={(e) =>
-              setBriefContent((prev) => ({
-                ...prev,
-                heroImageUrl: e.target.value,
-              }))
-            }
-            placeholder="https://..."
-          />
+          <div className="space-y-2">
+            <Input
+              value={briefContent.heroImageUrl ?? ""}
+              onChange={(e) =>
+                setBriefContent((prev) => ({
+                  ...prev,
+                  heroImageUrl: e.target.value,
+                }))
+              }
+              placeholder="https://..."
+            />
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  void uploadHeroImage(file);
+                  e.currentTarget.value = "";
+                }}
+                disabled={uploadingHero}
+              />
+              {uploadingHero ? <p className="text-xs text-gray-500">Uploading...</p> : null}
+            </div>
+            <p className="text-xs text-gray-500">Use either URL or upload image file.</p>
+          </div>
         </div>
 
         <div>
