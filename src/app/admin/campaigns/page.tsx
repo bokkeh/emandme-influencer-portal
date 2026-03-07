@@ -10,21 +10,57 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Megaphone, Plus, CalendarDays, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 
+function isCampaignSchemaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("campaigns") ||
+    lowered.includes("campaign_influencers") ||
+    lowered.includes("campaign_status") ||
+    lowered.includes("platform") ||
+    lowered.includes("does not exist") ||
+    lowered.includes("undefined table") ||
+    lowered.includes("undefined column")
+  );
+}
+
 export default async function CampaignsPage() {
-  const allCampaigns = await db
-    .select({
-      id: campaigns.id,
-      title: campaigns.title,
-      status: campaigns.status,
-      platforms: campaigns.platforms,
-      totalBudget: campaigns.totalBudget,
-      totalRevenue: campaigns.totalRevenue,
-      startDate: campaigns.startDate,
-      endDate: campaigns.endDate,
-      createdAt: campaigns.createdAt,
-    })
-    .from(campaigns)
-    .orderBy(campaigns.createdAt);
+  let allCampaigns: Array<{
+    id: string;
+    title: string;
+    status: "draft" | "active" | "paused" | "completed" | "cancelled";
+    platforms: Array<"instagram" | "tiktok" | "youtube" | "pinterest" | "blog">;
+    totalBudget: string | null;
+    totalRevenue: string;
+    startDate: Date | null;
+    endDate: Date | null;
+    createdAt: Date;
+  }> = [];
+  let schemaError: string | null = null;
+
+  try {
+    allCampaigns = await db
+      .select({
+        id: campaigns.id,
+        title: campaigns.title,
+        status: campaigns.status,
+        platforms: campaigns.platforms,
+        totalBudget: campaigns.totalBudget,
+        totalRevenue: campaigns.totalRevenue,
+        startDate: campaigns.startDate,
+        endDate: campaigns.endDate,
+        createdAt: campaigns.createdAt,
+      })
+      .from(campaigns)
+      .orderBy(campaigns.createdAt);
+  } catch (error) {
+    if (isCampaignSchemaError(error)) {
+      schemaError =
+        "Campaign database schema is missing or outdated. Run migrations 0007, 0009, and 0010 in Neon, then redeploy.";
+    } else {
+      throw error;
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -41,7 +77,19 @@ export default async function CampaignsPage() {
         </Link>
       </div>
 
-      {allCampaigns.length === 0 ? (
+      {schemaError ? (
+        <Card className="border border-amber-300 bg-amber-50 shadow-sm">
+          <CardContent className="p-5 space-y-2">
+            <p className="text-sm font-semibold text-amber-900">Campaigns unavailable</p>
+            <p className="text-sm text-amber-800">{schemaError}</p>
+            <p className="text-xs text-amber-700">
+              Migration files: `src/lib/db/migrations/0007_campaigns_backfill.sql`,
+              `src/lib/db/migrations/0009_campaign_enrollments_backfill.sql`,
+              `src/lib/db/migrations/0010_campaign_workflow_fields.sql`
+            </p>
+          </CardContent>
+        </Card>
+      ) : allCampaigns.length === 0 ? (
         <EmptyState
           icon={Megaphone}
           title="No campaigns yet"

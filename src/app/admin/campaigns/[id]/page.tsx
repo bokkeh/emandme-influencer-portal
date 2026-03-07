@@ -14,6 +14,21 @@ import { CampaignEnrollmentPipelineTable } from "@/components/admin/CampaignEnro
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
+function isCampaignSchemaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("campaigns") ||
+    lowered.includes("campaign_influencers") ||
+    lowered.includes("campaign_status") ||
+    lowered.includes("platform") ||
+    lowered.includes("enrollment_status") ||
+    lowered.includes("does not exist") ||
+    lowered.includes("undefined table") ||
+    lowered.includes("undefined column")
+  );
+}
+
 export default async function CampaignDetailPage({
   params,
 }: {
@@ -21,30 +36,87 @@ export default async function CampaignDetailPage({
 }) {
   const { id } = await params;
 
-  const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
-  if (!campaign) notFound();
+  let schemaError: string | null = null;
+  let campaign: (typeof campaigns.$inferSelect) | null = null;
+  let enrollments: Array<{
+    id: string;
+    status: "invited" | "accepted" | "declined" | "active" | "completed" | "removed";
+    pipelineStage: string | null;
+    contractStatus: string | null;
+    proposedFee: string | null;
+    agreedFee: string | null;
+    contractUrl: string | null;
+    contentDueDate: Date | null;
+    influencerId: string;
+    influencerName: string | null;
+    influencerTier: "nano" | "micro" | "mid" | "macro" | "mega";
+    userEmail: string;
+    userFirstName: string | null;
+    userLastName: string | null;
+  }> = [];
 
-  const enrollments = await db
-    .select({
-      id: campaignInfluencers.id,
-      status: campaignInfluencers.status,
-      pipelineStage: campaignInfluencers.pipelineStage,
-      contractStatus: campaignInfluencers.contractStatus,
-      proposedFee: campaignInfluencers.proposedFee,
-      agreedFee: campaignInfluencers.agreedFee,
-      contractUrl: campaignInfluencers.contractUrl,
-      contentDueDate: campaignInfluencers.contentDueDate,
-      influencerId: influencerProfiles.id,
-      influencerName: influencerProfiles.displayName,
-      influencerTier: influencerProfiles.tier,
-      userEmail: users.email,
-      userFirstName: users.firstName,
-      userLastName: users.lastName,
-    })
-    .from(campaignInfluencers)
-    .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
-    .innerJoin(users, eq(influencerProfiles.userId, users.id))
-    .where(eq(campaignInfluencers.campaignId, id));
+  try {
+    const found = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+    campaign = found[0] ?? null;
+    if (campaign) {
+      enrollments = await db
+        .select({
+          id: campaignInfluencers.id,
+          status: campaignInfluencers.status,
+          pipelineStage: campaignInfluencers.pipelineStage,
+          contractStatus: campaignInfluencers.contractStatus,
+          proposedFee: campaignInfluencers.proposedFee,
+          agreedFee: campaignInfluencers.agreedFee,
+          contractUrl: campaignInfluencers.contractUrl,
+          contentDueDate: campaignInfluencers.contentDueDate,
+          influencerId: influencerProfiles.id,
+          influencerName: influencerProfiles.displayName,
+          influencerTier: influencerProfiles.tier,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+        })
+        .from(campaignInfluencers)
+        .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
+        .innerJoin(users, eq(influencerProfiles.userId, users.id))
+        .where(eq(campaignInfluencers.campaignId, id));
+    }
+  } catch (error) {
+    if (isCampaignSchemaError(error)) {
+      schemaError =
+        "Campaign workflow schema is missing or outdated. Run migrations 0007, 0009, and 0010 in Neon, then redeploy.";
+    } else {
+      throw error;
+    }
+  }
+
+  if (schemaError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/admin/campaigns">
+            <Button variant="ghost" size="sm" className="gap-2 text-gray-500">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Campaigns
+            </Button>
+          </Link>
+        </div>
+        <Card className="border border-amber-300 bg-amber-50 shadow-sm">
+          <CardContent className="p-5 space-y-2">
+            <p className="text-sm font-semibold text-amber-900">Campaign detail unavailable</p>
+            <p className="text-sm text-amber-800">{schemaError}</p>
+            <p className="text-xs text-amber-700">
+              Migration files: `src/lib/db/migrations/0007_campaigns_backfill.sql`,
+              `src/lib/db/migrations/0009_campaign_enrollments_backfill.sql`,
+              `src/lib/db/migrations/0010_campaign_workflow_fields.sql`
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!campaign) notFound();
 
   const products = (campaign.products as Array<{ title: string; imageUrl?: string }>) ?? [];
 
