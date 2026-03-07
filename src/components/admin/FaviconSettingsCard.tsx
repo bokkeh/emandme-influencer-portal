@@ -16,11 +16,12 @@ export function FaviconSettingsCard() {
     (async () => {
       try {
         const res = await fetch("/api/admin/site-settings/favicon");
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw new Error((await res.text()) || "Failed to load favicon settings");
         const data = (await res.json()) as { faviconUrl: string | null };
         setCurrentUrl(data.faviconUrl);
-      } catch {
-        toast.error("Failed to load favicon settings");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load favicon settings";
+        toast.error(message);
       } finally {
         setBootLoading(false);
       }

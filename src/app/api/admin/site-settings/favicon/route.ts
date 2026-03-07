@@ -33,6 +33,16 @@ function isSchemaError(error: unknown) {
   );
 }
 
+function isBlobConfigError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("blob_read_write_token") ||
+    lowered.includes("read-write token") ||
+    lowered.includes("vercel blob")
+  );
+}
+
 export async function GET() {
   const guard = await requireAdminApi();
   if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
@@ -66,6 +76,12 @@ export async function POST(req: Request) {
     if (file.size > 1024 * 1024) {
       return new NextResponse("Favicon file must be <= 1MB", { status: 400 });
     }
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return new NextResponse(
+        "Missing BLOB_READ_WRITE_TOKEN in Vercel environment variables.",
+        { status: 500 }
+      );
+    }
 
     const ext = file.name.split(".").pop()?.toLowerCase() || "ico";
     const pathname = `settings/favicon-${Date.now()}-${crypto.randomUUID()}.${ext}`;
@@ -91,6 +107,12 @@ export async function POST(req: Request) {
     if (isSchemaError(error)) {
       return new NextResponse(
         "Site settings table is missing. Run DB migrations to create app_settings before using favicon upload.",
+        { status: 500 }
+      );
+    }
+    if (isBlobConfigError(error)) {
+      return new NextResponse(
+        "Vercel Blob is not configured. Set BLOB_READ_WRITE_TOKEN in Production env and redeploy.",
         { status: 500 }
       );
     }
