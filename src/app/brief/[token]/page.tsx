@@ -60,16 +60,17 @@ export default async function PublicCampaignBriefPage({
   const signUpForCampaignUrl = appUrl
     ? `${appUrl}/sign-up?redirect_url=${encodeURIComponent(`/onboarding?campaignId=${campaign.id}`)}`
     : `/sign-up?redirect_url=${encodeURIComponent(`/onboarding?campaignId=${campaign.id}`)}`;
-  const createProfileUrl = appUrl ? `${appUrl}/onboarding` : "/onboarding";
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-8">
       <div className="mx-auto max-w-4xl rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-        <img
-          src="https://emandmestudio.com/cdn/shop/files/black_logo_2x_a2bcf09e-ea61-4b77-8ca2-4f82c02e5c3f_220x.png?v=1619480991"
-          alt="Em & Me Studio"
-          className="h-9 w-auto"
-        />
+        <div className="flex justify-center p-[15px]">
+          <img
+            src="https://emandmestudio.com/cdn/shop/files/black_logo_2x_a2bcf09e-ea61-4b77-8ca2-4f82c02e5c3f_220x.png?v=1619480991"
+            alt="Em & Me Studio"
+            className="h-9 w-auto"
+          />
+        </div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">{campaign.title}</h1>
         {campaign.description ? <p className="mt-3 whitespace-pre-wrap text-sm text-gray-600">{campaign.description}</p> : null}
         {campaign.briefUrl ? (
@@ -118,12 +119,6 @@ export default async function PublicCampaignBriefPage({
             className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
             Visit Emandmestudio.com
-          </a>
-          <a
-            href={createProfileUrl}
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-          >
-            Create profile
           </a>
         </div>
       </div>
