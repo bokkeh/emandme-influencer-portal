@@ -460,6 +460,11 @@ export function RosterClient({
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignOptions, setCampaignOptions] = useState<Array<{ id: string; title: string; status: string }>>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
+  const [campaignEnrollSubmitting, setCampaignEnrollSubmitting] = useState(false);
   const [editingCell, setEditingCell] = useState<{ rowId: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [inlineSaving, setInlineSaving] = useState(false);
@@ -934,6 +939,57 @@ export function RosterClient({
       toast.success("Activity logged");
     } catch {
       toast.error("Failed to log activity");
+    }
+  }
+
+  async function loadCampaignOptions() {
+    setCampaignsLoading(true);
+    try {
+      const res = await fetch("/api/campaigns");
+      if (!res.ok) throw new Error(await res.text());
+      const data = (await res.json()) as Array<{ id: string; title: string; status: string }>;
+      setCampaignOptions(data);
+    } catch {
+      toast.error("Failed to load campaigns");
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }
+
+  async function openCampaignEnrollDialog() {
+    if (!detail?.profile) return;
+    setSelectedCampaignId("");
+    setCampaignDialogOpen(true);
+    await loadCampaignOptions();
+  }
+
+  async function enrollRosterInCampaign() {
+    if (!detail?.profile) return;
+    if (!selectedCampaignId) {
+      toast.error("Select a campaign");
+      return;
+    }
+
+    setCampaignEnrollSubmitting(true);
+    try {
+      const res = await fetch(`/api/campaigns/${selectedCampaignId}/enrollments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateId: `roster:${detail.profile.id}`,
+        }),
+      });
+      if (!res.ok) {
+        const message = await readErrorMessage(res, "Failed to enroll influencer");
+        throw new Error(message);
+      }
+      toast.success("Influencer enrolled in campaign");
+      setCampaignDialogOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to enroll influencer";
+      toast.error(message);
+    } finally {
+      setCampaignEnrollSubmitting(false);
     }
   }
 
@@ -2051,6 +2107,50 @@ export function RosterClient({
         </DialogContent>
       </Dialog>
 
+      <Dialog open={campaignDialogOpen} onOpenChange={setCampaignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add To Campaign</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-gray-600">
+              {detail?.profile ? (
+                <>
+                  Enroll <span className="font-medium text-gray-900">{detail.profile.fullName}</span> into a campaign.
+                </>
+              ) : null}
+            </div>
+            <div>
+              <Label>Campaign</Label>
+              <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId} disabled={campaignsLoading}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={campaignsLoading ? "Loading campaigns..." : "Select campaign"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaignOptions.map((campaign) => (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.title} ({titleCase(campaign.status)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCampaignDialogOpen(false)} disabled={campaignEnrollSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-rose-600 hover:bg-rose-700"
+                onClick={enrollRosterInCampaign}
+                disabled={campaignEnrollSubmitting || campaignsLoading}
+              >
+                {campaignEnrollSubmitting ? "Enrolling..." : "Enroll"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Sheet open={Boolean(selectedId)} onOpenChange={(open) => !open && setSelectedId(null)}>
         <SheetContent className="sm:max-w-2xl overflow-y-auto">
           <SheetHeader className="border-b border-gray-100">
@@ -2059,14 +2159,24 @@ export function RosterClient({
                 {detail?.profile.fullName ?? (detailLoading ? "Loading..." : "Influencer Profile")}
               </SheetTitle>
               {detail?.profile ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => openEditDialog(detail.profile)}
-                  className="shrink-0"
-                >
-                  Edit
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void openCampaignEnrollDialog()}
+                    className="shrink-0"
+                  >
+                    Add To Campaign
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openEditDialog(detail.profile)}
+                    className="shrink-0"
+                  >
+                    Edit
+                  </Button>
+                </div>
               ) : null}
             </div>
           </SheetHeader>

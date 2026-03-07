@@ -401,8 +401,14 @@ export const campaignInfluencers = pgTable(
       .references(() => influencerProfiles.id, { onDelete: "cascade" }),
 
     status: enrollmentStatusEnum("status").notNull().default("invited"),
+    pipelineStage: varchar("pipeline_stage", { length: 30 }).notNull().default("outreach"),
+    contractStatus: varchar("contract_status", { length: 30 }).notNull().default("not_sent"),
+    proposedFee: decimal("proposed_fee", { precision: 12, scale: 2 }),
     agreedFee: decimal("agreed_fee", { precision: 12, scale: 2 }),
     contentDueDate: timestamp("content_due_date", { withTimezone: true }),
+    contractUrl: text("contract_url"),
+    contractSentAt: timestamp("contract_sent_at", { withTimezone: true }),
+    contractSignedAt: timestamp("contract_signed_at", { withTimezone: true }),
 
     utmLinkId: uuid("utm_link_id"),
     discountCodeId: uuid("discount_code_id"),

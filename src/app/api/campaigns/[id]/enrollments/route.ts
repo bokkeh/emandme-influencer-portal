@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import {
   db,
   users,
@@ -183,8 +183,25 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       })
       .from(influencerRoster);
 
+    const syntheticRows = await db
+      .select({
+        clerkUserId: users.clerkUserId,
+        profileId: influencerProfiles.id,
+      })
+      .from(users)
+      .innerJoin(influencerProfiles, eq(influencerProfiles.userId, users.id))
+      .where(like(users.clerkUserId, "roster_%"));
+
+    const syntheticProfileByRosterId = new Map<string, string>();
+    for (const row of syntheticRows) {
+      const rosterId = row.clerkUserId.replace(/^roster_/, "");
+      syntheticProfileByRosterId.set(rosterId, row.profileId);
+    }
+
     const rosterCandidates = rosterRows
       .filter((row) => {
+        const syntheticProfileId = syntheticProfileByRosterId.get(row.id);
+        if (syntheticProfileId) return false;
         if (!row.email) return true;
         return !profileByEmail.has(row.email.toLowerCase());
       })
