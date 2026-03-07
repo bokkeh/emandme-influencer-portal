@@ -355,6 +355,22 @@ type CampaignProduct = {
   variantId?: string;
 };
 
+type CampaignBriefContent = {
+  campaignOverview?: string;
+  brandIntroduction?: string;
+  campaignGoals?: string;
+  deliverables?: string;
+  creativeDirection?: string;
+  keyProductPoints?: string;
+  messagingGuidelines?: string;
+  visualGuidelines?: string;
+  taggingHashtags?: string;
+  linkDiscountCode?: string;
+  timeline?: string;
+  ftcDisclosure?: string;
+  dosAndDonts?: string;
+};
+
 export const campaigns = pgTable(
   "campaigns",
   {
@@ -362,6 +378,8 @@ export const campaigns = pgTable(
     title: varchar("title", { length: 200 }).notNull(),
     description: text("description"),
     briefUrl: text("brief_url"),
+    briefContent: jsonb("brief_content").$type<CampaignBriefContent>().notNull().default({}),
+    briefShareToken: varchar("brief_share_token", { length: 64 }),
 
     status: campaignStatusEnum("status").notNull().default("draft"),
     platforms: platformEnum("platforms").array().notNull().default([]),
@@ -384,6 +402,7 @@ export const campaigns = pgTable(
   (t) => [
     index("campaigns_status_idx").on(t.status),
     index("campaigns_created_by_idx").on(t.createdByUserId),
+    uniqueIndex("campaigns_brief_share_token_idx").on(t.briefShareToken),
   ]
 );
 

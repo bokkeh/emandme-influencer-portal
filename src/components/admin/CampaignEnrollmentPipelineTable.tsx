@@ -68,8 +68,9 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows }: Props) {
   }
 
   return (
-    <table className="w-full text-sm">
-      <thead className="bg-gray-50 border-b border-gray-200">
+    <div className="overflow-x-auto">
+      <table className="min-w-[980px] w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-200">
         <tr>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Influencer</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Status</th>
@@ -80,8 +81,8 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows }: Props) {
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Content Due</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Tier</th>
         </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-100">
+        </thead>
+        <tbody className="divide-y divide-gray-100">
         {items.map((e) => {
           const name =
             (e.influencerName ?? `${e.userFirstName ?? ""} ${e.userLastName ?? ""}`.trim()) || e.userEmail;
@@ -169,7 +170,8 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows }: Props) {
             </tr>
           );
         })}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -203,6 +203,9 @@ export default async function CampaignDetailPage({
           campaignId={id}
           initialBrief={campaign.description ?? ""}
           initialBriefUrl={campaign.briefUrl ?? ""}
+          initialBriefContent={campaign.briefContent ?? {}}
+          initialBriefShareToken={campaign.briefShareToken ?? null}
+          appUrl={process.env.NEXT_PUBLIC_APP_URL ?? null}
         />
         <CampaignCostBenchmarksCard />
       </div>

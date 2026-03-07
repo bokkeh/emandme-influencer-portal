@@ -3,6 +3,26 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, campaigns, users } from "@/lib/db";
 
+type CampaignBriefContent = {
+  campaignOverview?: string;
+  brandIntroduction?: string;
+  campaignGoals?: string;
+  deliverables?: string;
+  creativeDirection?: string;
+  keyProductPoints?: string;
+  messagingGuidelines?: string;
+  visualGuidelines?: string;
+  taggingHashtags?: string;
+  linkDiscountCode?: string;
+  timeline?: string;
+  ftcDisclosure?: string;
+  dosAndDonts?: string;
+};
+
+function createBriefShareToken() {
+  return `${crypto.randomUUID().replaceAll("-", "")}${Date.now().toString(36)}`.slice(0, 48);
+}
+
 async function requireAdminApi() {
   const { userId, sessionClaims } = await auth();
   if (!userId) return { ok: false as const, status: 401, message: "Unauthorized" };
@@ -26,16 +46,31 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       title?: string;
       description?: string | null;
       briefUrl?: string | null;
+      briefContent?: CampaignBriefContent | null;
       status?: "draft" | "active" | "paused" | "completed" | "cancelled";
       totalBudget?: number | string | null;
       startDate?: string | null;
       endDate?: string | null;
     };
 
+    const [existing] = await db
+      .select({ briefShareToken: campaigns.briefShareToken })
+      .from(campaigns)
+      .where(eq(campaigns.id, id))
+      .limit(1);
+    if (!existing) return new NextResponse("Campaign not found", { status: 404 });
+
+    const shouldEnsureShareToken =
+      body.briefUrl !== undefined || body.description !== undefined || body.briefContent !== undefined;
+    const briefShareToken =
+      shouldEnsureShareToken && !existing.briefShareToken ? createBriefShareToken() : undefined;
+
     const setValues = {
       title: body.title?.trim() ? body.title.trim() : undefined,
       description: body.description !== undefined ? (body.description?.trim() || null) : undefined,
       briefUrl: body.briefUrl !== undefined ? (body.briefUrl?.trim() || null) : undefined,
+      briefContent: body.briefContent !== undefined ? body.briefContent ?? {} : undefined,
+      briefShareToken,
       status: body.status,
       totalBudget:
         body.totalBudget !== undefined
