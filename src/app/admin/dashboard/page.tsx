@@ -5,8 +5,10 @@ import {
   payments,
   assets,
   shipments,
+  users,
+  taxDocuments,
 } from "@/lib/db/schema";
-import { eq, count, sum, and, ne } from "drizzle-orm";
+import { eq, count, sum, and, or, isNull } from "drizzle-orm";
 import { KPICard } from "@/components/admin/KPICard";
 import {
   Users,
@@ -23,6 +25,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatDistanceToNow } from "date-fns";
 
 export default async function AdminDashboardPage() {
+  const priorTaxYear = new Date().getUTCFullYear() - 1;
+
   const [
     [influencerCount],
     [activeCampaignCount],
@@ -31,6 +35,9 @@ export default async function AdminDashboardPage() {
     [pendingShipmentsCount],
     recentInfluencers,
     recentAssets,
+    missingTaxProfiles,
+    allProfilesFor1099,
+    docsForPriorYear,
   ] = await Promise.all([
     db.select({ count: count() }).from(influencerProfiles),
     db
@@ -71,11 +78,49 @@ export default async function AdminDashboardPage() {
       .where(eq(assets.status, "pending_review"))
       .orderBy(assets.createdAt)
       .limit(5),
+    db
+      .select({
+        id: influencerProfiles.id,
+        displayName: influencerProfiles.displayName,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(influencerProfiles)
+      .innerJoin(users, eq(influencerProfiles.userId, users.id))
+      .where(
+        or(
+          isNull(influencerProfiles.taxLegalName),
+          isNull(influencerProfiles.taxClassification),
+          isNull(influencerProfiles.taxIdLast4),
+          isNull(influencerProfiles.taxFormSubmittedAt)
+        )
+      )
+      .limit(6),
+    db
+      .select({
+        id: influencerProfiles.id,
+        displayName: influencerProfiles.displayName,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+      })
+      .from(influencerProfiles)
+      .innerJoin(users, eq(influencerProfiles.userId, users.id)),
+    db
+      .select({
+        influencerProfileId: taxDocuments.influencerProfileId,
+      })
+      .from(taxDocuments)
+      .where(and(eq(taxDocuments.taxYear, priorTaxYear), eq(taxDocuments.documentType, "1099_nec"))),
   ]);
 
   const pendingPaymentTotal = pendingPaymentsResult.total
     ? `$${Number(pendingPaymentsResult.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
     : "$0.00";
+
+  const docSet = new Set(docsForPriorYear.map((doc) => doc.influencerProfileId));
+  const missing1099Profiles = allProfilesFor1099.filter((profile) => !docSet.has(profile.id));
 
   return (
     <div className="space-y-8">
@@ -129,6 +174,78 @@ export default async function AdminDashboardPage() {
           iconColor="text-teal-600"
           iconBg="bg-teal-50"
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="border border-amber-200 bg-amber-50/30 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold text-amber-900">
+              Missing Tax Info ({missingTaxProfiles.length})
+            </CardTitle>
+            <Link href="/admin/tax-documents">
+              <Button variant="ghost" size="sm" className="text-amber-700 hover:text-amber-800">
+                Fix now →
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {missingTaxProfiles.length === 0 ? (
+              <p className="py-2 text-sm text-emerald-700">All profiles have required tax details.</p>
+            ) : (
+              <ul className="space-y-2">
+                {missingTaxProfiles.map((profile) => {
+                  const name =
+                    profile.displayName ||
+                    `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim() ||
+                    profile.userEmail;
+                  return (
+                    <li key={profile.id} className="text-sm text-amber-900">
+                      {name}
+                    </li>
+                  );
+                })}
+                {missingTaxProfiles.length >= 6 ? (
+                  <li className="text-xs text-amber-700">Showing first 6 profiles.</li>
+                ) : null}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-rose-200 bg-rose-50/30 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold text-rose-900">
+              Missing {priorTaxYear} 1099 ({missing1099Profiles.length})
+            </CardTitle>
+            <Link href="/admin/tax-documents">
+              <Button variant="ghost" size="sm" className="text-rose-700 hover:text-rose-800">
+                Upload 1099s →
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {missing1099Profiles.length === 0 ? (
+              <p className="py-2 text-sm text-emerald-700">All profiles have a {priorTaxYear} 1099 uploaded.</p>
+            ) : (
+              <ul className="space-y-2">
+                {missing1099Profiles.slice(0, 6).map((profile) => {
+                  const name =
+                    profile.displayName ||
+                    `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim() ||
+                    profile.userEmail;
+                  return (
+                    <li key={profile.id} className="text-sm text-rose-900">
+                      {name}
+                    </li>
+                  );
+                })}
+                {missing1099Profiles.length > 6 ? (
+                  <li className="text-xs text-rose-700">Showing first 6 profiles.</li>
+                ) : null}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recent Activity */}

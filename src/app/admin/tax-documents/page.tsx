@@ -129,6 +129,24 @@ export default function AdminTaxDocumentsPage() {
 
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader>
+          <CardTitle className="text-base">Year-end 1099 Summary Export</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-3">
+          <div>
+            <Label>Year</Label>
+            <Input className="w-32" value={taxYear} onChange={(e) => setTaxYear(e.target.value)} />
+          </div>
+          <a href={`/api/admin/tax-documents/export?year=${encodeURIComponent(taxYear)}&format=csv`}>
+            <Button variant="outline">Download CSV</Button>
+          </a>
+          <a href={`/api/admin/tax-documents/export?year=${encodeURIComponent(taxYear)}&format=pdf`}>
+            <Button variant="outline">Download PDF</Button>
+          </a>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader>
           <CardTitle className="text-base">Upload 1099</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
