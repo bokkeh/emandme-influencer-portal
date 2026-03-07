@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, campaigns, users } from "@/lib/db";
 
 type CampaignBriefContent = {
+  heroImageUrl?: string;
   campaignOverview?: string;
   brandIntroduction?: string;
   campaignGoals?: string;

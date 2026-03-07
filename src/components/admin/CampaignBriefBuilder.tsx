@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 type CampaignBriefContent = {
+  heroImageUrl?: string;
   campaignOverview?: string;
   brandIntroduction?: string;
   campaignGoals?: string;
@@ -281,6 +282,20 @@ export function CampaignBriefBuilder({
         <div>
           <Label>Brief URL (Drive/Notion)</Label>
           <Input value={briefUrl} onChange={(e) => setBriefUrl(e.target.value)} placeholder="https://..." />
+        </div>
+
+        <div>
+          <Label>Header Image URL (full-width image above logo/title)</Label>
+          <Input
+            value={briefContent.heroImageUrl ?? ""}
+            onChange={(e) =>
+              setBriefContent((prev) => ({
+                ...prev,
+                heroImageUrl: e.target.value,
+              }))
+            }
+            placeholder="https://..."
+          />
         </div>
 
         <div>

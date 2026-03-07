@@ -356,6 +356,7 @@ type CampaignProduct = {
 };
 
 type CampaignBriefContent = {
+  heroImageUrl?: string;
   campaignOverview?: string;
   brandIntroduction?: string;
   campaignGoals?: string;

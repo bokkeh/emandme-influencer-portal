@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, campaigns } from "@/lib/db";
 
 type CampaignBriefContent = {
+  heroImageUrl?: string;
   campaignOverview?: string;
   brandIntroduction?: string;
   campaignGoals?: string;
@@ -56,6 +57,7 @@ export default async function PublicCampaignBriefPage({
   if (!campaign) notFound();
 
   const briefContent = (campaign.briefContent ?? {}) as CampaignBriefContent;
+  const heroImageUrl = briefContent.heroImageUrl?.trim() ?? "";
   const hasStructuredContent = BRIEF_SECTIONS.some((section) => Boolean(briefContent[section.key]?.trim()));
   const signUpForCampaignUrl = appUrl
     ? `${appUrl}/sign-up?redirect_url=${encodeURIComponent(`/onboarding?campaignId=${campaign.id}`)}`
@@ -64,7 +66,12 @@ export default async function PublicCampaignBriefPage({
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-8">
       <div className="mx-auto max-w-4xl rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
-        <div className="flex justify-center p-[15px]">
+        {heroImageUrl ? (
+          <div className="mb-6 overflow-hidden rounded-lg border border-gray-200">
+            <img src={heroImageUrl} alt="Campaign brief header" className="h-auto w-full object-cover" />
+          </div>
+        ) : null}
+        <div className="mb-6 flex justify-center p-[15px]">
           <img
             src="https://emandmestudio.com/cdn/shop/files/black_logo_2x_a2bcf09e-ea61-4b77-8ca2-4f82c02e5c3f_220x.png?v=1619480991"
             alt="Em & Me Studio"
