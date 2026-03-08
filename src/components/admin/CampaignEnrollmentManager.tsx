@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ type Props = {
 };
 
 export function CampaignEnrollmentManager({ campaignId }: Props) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -87,7 +85,7 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
 
       toast.success("Influencer enrolled");
       setOpen(false);
-      router.refresh();
+      window.dispatchEvent(new CustomEvent(`campaign-enrollment-updated-${campaignId}`));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to enroll influencer";
       toast.error(message);

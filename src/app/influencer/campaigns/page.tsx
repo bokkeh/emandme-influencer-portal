@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users, influencerProfiles, campaignInfluencers, campaigns } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,51 +66,74 @@ export default async function InfluencerCampaignsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {myCampaigns.map((c) => (
-            <Link key={c.enrollmentId} href={`/influencer/campaigns/${c.campaignId}`}>
-              <Card className="border border-gray-200 shadow-sm hover:shadow-md hover:border-rose-200 transition-all cursor-pointer">
+          {myCampaigns.map((campaign) => {
+            const isPendingApproval = campaign.status === "invited";
+            const dateLabel = campaign.startDate
+              ? campaign.endDate
+                ? `${format(new Date(campaign.startDate), "MMM d")} - ${format(new Date(campaign.endDate), "MMM d, yyyy")}`
+                : format(new Date(campaign.startDate), "MMM d, yyyy")
+              : null;
+
+            const card = (
+              <Card
+                className={`border border-gray-200 shadow-sm transition-all ${
+                  isPendingApproval ? "bg-amber-50/40" : "hover:shadow-md hover:border-rose-200 cursor-pointer"
+                }`}
+              >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{c.campaignTitle}</h3>
-                      {c.campaignDescription && (
-                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">{c.campaignDescription}</p>
+                      <h3 className="font-semibold text-gray-900">{campaign.campaignTitle}</h3>
+                      {campaign.campaignDescription && (
+                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">{campaign.campaignDescription}</p>
                       )}
+                      {isPendingApproval ? (
+                        <p className="mt-2 text-xs font-medium text-amber-700">
+                          Pending admin approval. You&apos;ll get access once approved.
+                        </p>
+                      ) : null}
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        {c.campaignPlatforms.map((p) => (
-                          <PlatformBadge key={p} platform={p} />
+                        {campaign.campaignPlatforms.map((platform) => (
+                          <PlatformBadge key={platform} platform={platform} />
                         ))}
                       </div>
                     </div>
-                    <StatusBadge status={c.status} />
+                    <StatusBadge status={campaign.status} />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-6 text-sm">
-                    {c.agreedFee && (
+                    {campaign.agreedFee && (
                       <div>
                         <p className="text-xs text-gray-400 font-medium">YOUR FEE</p>
-                        <p className="font-semibold text-gray-900">${Number(c.agreedFee).toFixed(2)}</p>
+                        <p className="font-semibold text-gray-900">${Number(campaign.agreedFee).toFixed(2)}</p>
                       </div>
                     )}
-                    {c.contentDueDate && (
+                    {campaign.contentDueDate && (
                       <div>
                         <p className="text-xs text-gray-400 font-medium">CONTENT DUE</p>
-                        <p className="font-semibold text-gray-900">{format(new Date(c.contentDueDate), "MMM d, yyyy")}</p>
+                        <p className="font-semibold text-gray-900">{format(new Date(campaign.contentDueDate), "MMM d, yyyy")}</p>
                       </div>
                     )}
-                    {c.startDate && (
+                    {dateLabel ? (
                       <div>
                         <p className="text-xs text-gray-400 font-medium">DATES</p>
-                        <p className="font-medium text-gray-600">
-                          {format(new Date(c.startDate), "MMM d")}
-                          {c.endDate && ` — ${format(new Date(c.endDate), "MMM d, yyyy")}`}
-                        </p>
+                        <p className="font-medium text-gray-600">{dateLabel}</p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
-            </Link>
-          ))}
+            );
+
+            if (isPendingApproval) {
+              return <div key={campaign.enrollmentId}>{card}</div>;
+            }
+
+            return (
+              <Link key={campaign.enrollmentId} href={`/influencer/campaigns/${campaign.campaignId}`}>
+                {card}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

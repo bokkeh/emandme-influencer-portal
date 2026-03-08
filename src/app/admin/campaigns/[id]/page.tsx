@@ -5,6 +5,7 @@ import {
   campaigns,
   campaignInfluencers,
   influencerProfiles,
+  socialAccounts,
   users,
   assets,
   shipments,
@@ -15,11 +16,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformBadge } from "@/components/shared/PlatformBadge";
-import { CampaignEnrollmentManager } from "@/components/admin/CampaignEnrollmentManager";
 import { CampaignBriefBuilder } from "@/components/admin/CampaignBriefBuilder";
 import { CampaignCostBenchmarksCard } from "@/components/admin/CampaignCostBenchmarksCard";
 import { CampaignLaunchChecklistCard } from "@/components/admin/CampaignLaunchChecklistCard";
-import { CampaignEnrollmentPipelineTable } from "@/components/admin/CampaignEnrollmentPipelineTable";
+import { CampaignEnrolledSection } from "@/components/admin/CampaignEnrolledSection";
 import { CampaignHeaderEditor } from "@/components/admin/CampaignHeaderEditor";
 import { CampaignProductSelector } from "@/components/admin/CampaignProductSelector";
 import { CampaignContentLibraryManager } from "@/components/admin/CampaignContentLibraryManager";
@@ -83,6 +83,9 @@ export default async function CampaignDetailPage({
     userEmail: string;
     userFirstName: string | null;
     userLastName: string | null;
+    avatarUrl: string | null;
+    handle: string | null;
+    handleProfileUrl: string | null;
   }> = [];
 
   try {
@@ -105,10 +108,20 @@ export default async function CampaignDetailPage({
           userEmail: users.email,
           userFirstName: users.firstName,
           userLastName: users.lastName,
+          avatarUrl: users.avatarUrl,
+          handle: socialAccounts.handle,
+          handleProfileUrl: socialAccounts.profileUrl,
         })
         .from(campaignInfluencers)
         .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
         .innerJoin(users, eq(influencerProfiles.userId, users.id))
+        .leftJoin(
+          socialAccounts,
+          and(
+            eq(socialAccounts.influencerProfileId, influencerProfiles.id),
+            eq(socialAccounts.platform, "instagram")
+          )
+        )
         .where(eq(campaignInfluencers.campaignId, id));
 
       const [shipment] = await db
@@ -350,17 +363,7 @@ export default async function CampaignDetailPage({
       ) : null}
 
       {activeTab === "enrolled" ? (
-        <Card className="border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between p-6 pb-3">
-            <p className="text-base font-semibold text-gray-900">
-              Enrolled Influencers ({enrollments.length})
-            </p>
-            <CampaignEnrollmentManager campaignId={id} />
-          </div>
-          <CardContent className="p-0">
-            <CampaignEnrollmentPipelineTable campaignId={id} rows={enrollments} />
-          </CardContent>
-        </Card>
+        <CampaignEnrolledSection campaignId={id} initialRows={enrollments} />
       ) : null}
 
       {activeTab === "content" ? (

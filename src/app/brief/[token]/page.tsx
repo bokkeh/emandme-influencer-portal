@@ -59,9 +59,7 @@ export default async function PublicCampaignBriefPage({
   const briefContent = (campaign.briefContent ?? {}) as CampaignBriefContent;
   const heroImageUrl = briefContent.heroImageUrl?.trim() ?? "";
   const hasStructuredContent = BRIEF_SECTIONS.some((section) => Boolean(briefContent[section.key]?.trim()));
-  const signUpForCampaignUrl = appUrl
-    ? `${appUrl}/sign-up?redirect_url=${encodeURIComponent(`/onboarding?campaignId=${campaign.id}`)}`
-    : `/sign-up?redirect_url=${encodeURIComponent(`/onboarding?campaignId=${campaign.id}`)}`;
+  const joinCampaignUrl = appUrl ? `${appUrl}/api/brief/${token}/join` : `/api/brief/${token}/join`;
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-8">
@@ -114,7 +112,7 @@ export default async function PublicCampaignBriefPage({
 
         <div className="mt-10 flex flex-col gap-3 border-t border-gray-200 pt-6 sm:flex-row">
           <a
-            href={signUpForCampaignUrl}
+            href={joinCampaignUrl}
             className="inline-flex items-center justify-center rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
           >
             Sign up for the campaign

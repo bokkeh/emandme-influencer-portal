@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +21,9 @@ type EnrollmentRow = {
   userEmail: string;
   userFirstName: string | null;
   userLastName: string | null;
+  avatarUrl?: string | null;
+  handle?: string | null;
+  handleProfileUrl?: string | null;
 };
 
 const PIPELINE_STAGES = [
@@ -38,11 +41,46 @@ const CONTRACT_STATUSES = ["not_sent", "sent", "signed", "declined"] as const;
 type Props = {
   campaignId: string;
   rows: EnrollmentRow[];
+  onRowsChange?: (rows: EnrollmentRow[]) => void;
 };
 
-export function CampaignEnrollmentPipelineTable({ campaignId, rows }: Props) {
+export function CampaignEnrollmentPipelineTable({ campaignId, rows, onRowsChange }: Props) {
   const [items, setItems] = useState(rows);
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setItems(rows);
+  }, [rows]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshEnrolledRows() {
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}/enrollments?mode=enrolled`, { cache: "no-store" });
+        if (!res.ok) throw new Error((await res.text()) || "Failed to refresh enrolled influencers");
+        const nextRows = (await res.json()) as EnrollmentRow[];
+        if (!active) return;
+        setItems(nextRows);
+        onRowsChange?.(nextRows);
+      } catch {
+        // Keep current UI if refresh fails.
+      }
+    }
+
+    void refreshEnrolledRows();
+
+    const eventName = `campaign-enrollment-updated-${campaignId}`;
+    const handler = () => {
+      void refreshEnrolledRows();
+    };
+    window.addEventListener(eventName, handler as EventListener);
+
+    return () => {
+      active = false;
+      window.removeEventListener(eventName, handler as EventListener);
+    };
+  }, [campaignId, onRowsChange]);
 
   async function patchEnrollment(enrollmentId: string, payload: Record<string, unknown>) {
     setSavingId(enrollmentId);
@@ -54,7 +92,11 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows }: Props) {
       });
       if (!res.ok) throw new Error((await res.text()) || "Failed to update enrollment");
       const updated = (await res.json()) as EnrollmentRow;
-      setItems((prev) => prev.map((item) => (item.id === enrollmentId ? { ...item, ...updated } : item)));
+      setItems((prev) => {
+        const nextRows = prev.map((item) => (item.id === enrollmentId ? { ...item, ...updated } : item));
+        onRowsChange?.(nextRows);
+        return nextRows;
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update enrollment";
       toast.error(message);

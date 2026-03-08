@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import {
   db,
   users,
@@ -8,6 +8,7 @@ import {
   influencerProfiles,
   campaignInfluencers,
   influencerRoster,
+  socialAccounts,
 } from "@/lib/db";
 
 async function requireAdmin() {
@@ -130,9 +131,76 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   try {
     const { id } = await params;
+    const req = _ as Request;
+    const url = new URL(req.url);
+    const mode = url.searchParams.get("mode");
 
     const [campaign] = await db.select({ id: campaigns.id }).from(campaigns).where(eq(campaigns.id, id)).limit(1);
     if (!campaign) return new NextResponse("Campaign not found", { status: 404 });
+
+    if (mode === "enrolled") {
+      const rows = await db
+        .select({
+          id: campaignInfluencers.id,
+          status: campaignInfluencers.status,
+          pipelineStage: campaignInfluencers.pipelineStage,
+          contractStatus: campaignInfluencers.contractStatus,
+          proposedFee: campaignInfluencers.proposedFee,
+          agreedFee: campaignInfluencers.agreedFee,
+          contractUrl: campaignInfluencers.contractUrl,
+          contentDueDate: campaignInfluencers.contentDueDate,
+          influencerId: influencerProfiles.id,
+          influencerName: influencerProfiles.displayName,
+          influencerTier: influencerProfiles.tier,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          avatarUrl: users.avatarUrl,
+        })
+        .from(campaignInfluencers)
+        .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
+        .innerJoin(users, eq(influencerProfiles.userId, users.id))
+        .where(eq(campaignInfluencers.campaignId, id));
+
+      const influencerIds = rows.map((row) => row.influencerId);
+      const handles =
+        influencerIds.length > 0
+          ? await db
+              .select({
+                influencerProfileId: socialAccounts.influencerProfileId,
+                handle: socialAccounts.handle,
+                profileUrl: socialAccounts.profileUrl,
+              })
+              .from(socialAccounts)
+              .where(
+                and(
+                  inArray(socialAccounts.influencerProfileId, influencerIds),
+                  eq(socialAccounts.platform, "instagram")
+                )
+              )
+          : [];
+
+      const handleByProfile = new Map<string, { handle: string; profileUrl: string | null }>();
+      for (const item of handles) {
+        if (!handleByProfile.has(item.influencerProfileId)) {
+          handleByProfile.set(item.influencerProfileId, {
+            handle: item.handle,
+            profileUrl: item.profileUrl ?? null,
+          });
+        }
+      }
+
+      return NextResponse.json(
+        rows.map((row) => {
+          const social = handleByProfile.get(row.influencerId);
+          return {
+            ...row,
+            handle: social?.handle ?? null,
+            handleProfileUrl: social?.profileUrl ?? null,
+          };
+        })
+      );
+    }
 
     const rows = await db
       .select({

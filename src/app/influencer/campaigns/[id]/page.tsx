@@ -82,6 +82,7 @@ export default async function InfluencerCampaignDetailPage({
     .limit(1);
 
   if (!enrollment) notFound();
+  if (enrollment.status === "invited") redirect("/influencer/campaigns");
 
   const [myUTMLink, myDiscountCode] = await Promise.all([
     enrollment.utmLinkId
