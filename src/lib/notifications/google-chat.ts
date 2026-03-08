@@ -110,4 +110,7 @@ export const googleChat = {
 
   campaignMilestone: (campaignTitle: string, milestone: string) =>
     sendText(`🎉 Campaign milestone: "${campaignTitle}" — ${milestone}`),
+
+  campaignSignupRequested: (campaignTitle: string, influencerName: string) =>
+    sendText(`📝 Campaign signup request: ${influencerName} joined "${campaignTitle}" (pending approval).`),
 };

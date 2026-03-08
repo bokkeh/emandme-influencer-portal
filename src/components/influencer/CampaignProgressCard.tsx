@@ -19,6 +19,7 @@ type ChecklistItem = {
 type Props = {
   campaignId: string;
   canSubmitPetInfo: boolean;
+  profileComplete: boolean;
   checklist: ChecklistItem[];
   initialPetInfo: {
     petName: string;
@@ -29,7 +30,13 @@ type Props = {
   };
 };
 
-export function CampaignProgressCard({ campaignId, canSubmitPetInfo, checklist, initialPetInfo }: Props) {
+export function CampaignProgressCard({
+  campaignId,
+  canSubmitPetInfo,
+  profileComplete,
+  checklist,
+  initialPetInfo,
+}: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [petName, setPetName] = useState(initialPetInfo.petName);
@@ -100,7 +107,9 @@ export function CampaignProgressCard({ campaignId, canSubmitPetInfo, checklist, 
           <p className="text-sm font-semibold text-gray-900">Pet Tag Information</p>
           {!canSubmitPetInfo ? (
             <p className="text-xs text-amber-700">
-              Your enrollment is not approved yet. You can submit pet details after approval.
+              {profileComplete
+                ? "Your enrollment is not approved yet. You can submit pet details after approval."
+                : "Please complete your profile first, then submit your pet details."}
             </p>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
@@ -150,4 +159,3 @@ export function CampaignProgressCard({ campaignId, canSubmitPetInfo, checklist, 
     </Card>
   );
 }
-

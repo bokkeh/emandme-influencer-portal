@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db, campaigns, users, influencerProfiles, campaignInfluencers } from "@/lib/db";
+import { googleChat } from "@/lib/notifications/google-chat";
 
 function redirectFromRequest(req: Request, path: string) {
   const url = new URL(path, req.url);
@@ -12,7 +13,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   const { token } = await params;
 
   const [campaign] = await db
-    .select({ id: campaigns.id })
+    .select({ id: campaigns.id, title: campaigns.title })
     .from(campaigns)
     .where(eq(campaigns.briefShareToken, token))
     .limit(1);
@@ -30,7 +31,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   }
 
   const [user] = await db
-    .select({ id: users.id })
+    .select({
+      id: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
     .from(users)
     .where(eq(users.clerkUserId, userId))
     .limit(1);
@@ -68,8 +74,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
       pipelineStage: "outreach",
       contractStatus: "not_sent",
     });
+
+    const influencerName =
+      `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email;
+    googleChat.campaignSignupRequested(campaign.title, influencerName).catch(() => {});
   }
 
   return redirectFromRequest(req, "/influencer/campaigns?joined=1");
 }
-

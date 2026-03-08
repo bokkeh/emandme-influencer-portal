@@ -41,7 +41,17 @@ export default async function InfluencerCampaignDetailPage({
   if (!user) redirect("/onboarding");
 
   const [profile] = await db
-    .select({ id: influencerProfiles.id })
+    .select({
+      id: influencerProfiles.id,
+      displayName: influencerProfiles.displayName,
+      phone: influencerProfiles.phone,
+      niche: influencerProfiles.niche,
+      shippingAddressLine1: influencerProfiles.shippingAddressLine1,
+      shippingCity: influencerProfiles.shippingCity,
+      shippingState: influencerProfiles.shippingState,
+      shippingPostalCode: influencerProfiles.shippingPostalCode,
+      shippingCountry: influencerProfiles.shippingCountry,
+    })
     .from(influencerProfiles)
     .where(eq(influencerProfiles.userId, user.id))
     .limit(1);
@@ -135,9 +145,20 @@ export default async function InfluencerCampaignDetailPage({
       enrollment.petPersonality &&
       enrollment.tagPersonalizationText
   );
+  const profileComplete = Boolean(
+    (profile.displayName ?? "").trim() &&
+      (profile.phone ?? "").trim() &&
+      (profile.niche ?? "").trim() &&
+      (profile.shippingAddressLine1 ?? "").trim() &&
+      (profile.shippingCity ?? "").trim() &&
+      (profile.shippingState ?? "").trim() &&
+      (profile.shippingPostalCode ?? "").trim() &&
+      (profile.shippingCountry ?? "").trim()
+  );
   const joinedCampaign = ["accepted", "active", "completed"].includes(enrollment.status);
   const checklist = [
     { label: "Joined campaign", done: joinedCampaign },
+    { label: "Complete your profile", done: profileComplete },
     { label: "Submitted pet tag info", done: petInfoSubmitted },
     { label: "Product shipped", done: Boolean(shipment[0]) },
     { label: "Content submitted for approval", done: Boolean(submittedAsset[0]) },
@@ -248,7 +269,8 @@ export default async function InfluencerCampaignDetailPage({
 
       <CampaignProgressCard
         campaignId={id}
-        canSubmitPetInfo={joinedCampaign}
+        canSubmitPetInfo={joinedCampaign && profileComplete}
+        profileComplete={profileComplete}
         checklist={checklist}
         initialPetInfo={{
           petName: enrollment.petName ?? "",
