@@ -40,6 +40,7 @@ type ShipmentStatus = "preparing" | "shipped" | "delivered" | "returned";
 type ShipmentProduct = {
   name: string;
   qty: number;
+  personalizationText?: string;
 };
 
 type ShipmentRow = {
@@ -117,7 +118,9 @@ export function ShippingTrackerClient({
       const name =
         (s.influencerName ?? `${s.userFirstName ?? ""} ${s.userLastName ?? ""}`.trim()) ||
         s.userEmail;
-      const products = (s.products ?? []).map((p) => p.name).join(" ");
+      const products = (s.products ?? [])
+        .map((p) => `${p.name} ${p.personalizationText ?? ""}`)
+        .join(" ");
       return [name, s.userEmail, s.status, s.carrier ?? "", products].join(" ").toLowerCase().includes(q);
     });
   }, [search, shipments]);
@@ -354,10 +357,6 @@ export function ShippingTrackerClient({
                       (s.influencerName ??
                         `${s.userFirstName ?? ""} ${s.userLastName ?? ""}`.trim()) ||
                       s.userEmail;
-                    const productList = (s.products ?? [])
-                      .map((p) => `${p.name} x${p.qty}`)
-                      .join(", ");
-
                     return (
                       <TableRow key={s.id}>
                         <TableCell>
@@ -368,8 +367,25 @@ export function ShippingTrackerClient({
                             {name}
                           </Link>
                         </TableCell>
-                        <TableCell className="max-w-[240px] text-sm text-gray-600 truncate">
-                          {productList || "-"}
+                        <TableCell className="max-w-[300px]">
+                          {s.products && s.products.length > 0 ? (
+                            <div className="space-y-1">
+                              {s.products.map((p, idx) => (
+                                <div key={`${s.id}-product-${idx}`} className="rounded bg-gray-50 p-2">
+                                  <p className="text-sm font-medium text-gray-700">
+                                    {p.name} x{p.qty}
+                                  </p>
+                                  {p.personalizationText ? (
+                                    <p className="mt-0.5 text-xs text-gray-500">
+                                      Personalization: {p.personalizationText}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="space-y-2">
                           <StatusBadge status={s.status} />

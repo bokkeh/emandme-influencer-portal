@@ -11,6 +11,7 @@ type CampaignProduct = {
   shopifyProductId: string;
   title: string;
   imageUrl?: string;
+  imageUrls?: string[];
   variantId?: string;
 };
 
@@ -19,6 +20,7 @@ type ShopifyProduct = {
   title: string;
   handle: string;
   imageUrl: string | null;
+  imageUrls?: string[];
   variantId: string | null;
 };
 
@@ -66,6 +68,7 @@ export function CampaignProductSelector({ campaignId, initialProducts }: Props) 
         shopifyProductId: product.id,
         title: product.title,
         imageUrl: product.imageUrl ?? undefined,
+        imageUrls: product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : [],
         variantId: product.variantId ?? undefined,
       },
     ]);
@@ -179,4 +182,3 @@ export function CampaignProductSelector({ campaignId, initialProducts }: Props) 
     </Card>
   );
 }
-

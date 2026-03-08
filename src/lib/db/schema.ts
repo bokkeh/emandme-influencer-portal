@@ -352,6 +352,7 @@ type CampaignProduct = {
   shopifyProductId: string;
   title: string;
   imageUrl?: string;
+  imageUrls?: string[];
   variantId?: string;
 };
 
@@ -662,6 +663,7 @@ type ShipmentProduct = {
   variant?: string;
   qty: number;
   shopifyProductId?: string;
+  personalizationText?: string;
 };
 
 type ShippingAddress = {

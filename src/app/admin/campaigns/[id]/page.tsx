@@ -209,12 +209,14 @@ export default async function CampaignDetailPage({
       shopifyProductId?: string;
       title: string;
       imageUrl?: string;
+      imageUrls?: string[];
       variantId?: string;
     }>) ?? []
     ).map((product, index) => ({
       shopifyProductId: product.shopifyProductId ?? `manual-${index}-${product.title}`,
       title: product.title,
       imageUrl: product.imageUrl,
+      imageUrls: product.imageUrls ?? (product.imageUrl ? [product.imageUrl] : []),
       variantId: product.variantId,
     }));
   const briefContent = (campaign.briefContent ?? {}) as Record<string, string | undefined>;

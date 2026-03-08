@@ -14,7 +14,16 @@ type CampaignProduct = {
   shopifyProductId?: string;
   title: string;
   imageUrl?: string;
+  imageUrls?: string[];
   variantId?: string;
+};
+
+type SelectedProductInput = {
+  selectedProductId?: string | null;
+  selectedProductTitle?: string | null;
+  selectedProductVariantId?: string | null;
+  personalizationText?: string | null;
+  imageUrl?: string | null;
 };
 
 export async function PATCH(
@@ -41,6 +50,7 @@ export async function PATCH(
       petAge?: string;
       petPersonality?: string;
       tagPersonalizationText?: string;
+      selectedProducts?: SelectedProductInput[];
       selectedProductId?: string;
       selectedProductTitle?: string;
       selectedProductVariantId?: string;
@@ -106,8 +116,7 @@ export async function PATCH(
       !body.petName?.trim() ||
       !body.petBreed?.trim() ||
       !body.petAge?.trim() ||
-      !body.petPersonality?.trim() ||
-      !body.tagPersonalizationText?.trim()
+      !body.petPersonality?.trim()
     ) {
       return new NextResponse("Complete all pet/tag fields", { status: 400 });
     }
@@ -124,23 +133,64 @@ export async function PATCH(
     const petBreed = String(body.petBreed ?? "").trim();
     const petAge = String(body.petAge ?? "").trim();
     const petPersonality = String(body.petPersonality ?? "").trim();
-    const tagPersonalizationText = String(body.tagPersonalizationText ?? "").trim();
-
     const campaignProducts = (campaign.products ?? []) as CampaignProduct[];
-    const selectedProduct = campaignProducts.find(
-      (p) => p.shopifyProductId === body.selectedProductId
-    );
+    const selectedProductsPayload = Array.isArray(body.selectedProducts)
+      ? body.selectedProducts
+      : [];
+    const normalizedSelectedProducts = selectedProductsPayload
+      .map((item) => {
+        const selectedFromCampaign = campaignProducts.find(
+          (p) => p.shopifyProductId === item.selectedProductId
+        );
+        const title =
+          String(item.selectedProductTitle ?? "").trim() ||
+          selectedFromCampaign?.title?.trim() ||
+          "";
+        const personalizationText = String(item.personalizationText ?? "").trim();
+        if (!title || !personalizationText) return null;
+        return {
+          selectedProductId:
+            String(item.selectedProductId ?? "").trim() ||
+            selectedFromCampaign?.shopifyProductId ||
+            null,
+          selectedProductTitle: title,
+          selectedProductVariantId:
+            String(item.selectedProductVariantId ?? "").trim() ||
+            selectedFromCampaign?.variantId ||
+            null,
+          personalizationText,
+          imageUrl:
+            String(item.imageUrl ?? "").trim() || selectedFromCampaign?.imageUrl || null,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    const selectedTitle =
-      body.selectedProductTitle?.trim() || selectedProduct?.title?.trim() || "";
-    if (!selectedTitle) {
-      return new NextResponse("Select a campaign tag/product", { status: 400 });
+    if (normalizedSelectedProducts.length === 0) {
+      const selectedProduct = campaignProducts.find(
+        (p) => p.shopifyProductId === body.selectedProductId
+      );
+      const selectedTitle =
+        body.selectedProductTitle?.trim() || selectedProduct?.title?.trim() || "";
+      const tagPersonalizationText = String(body.tagPersonalizationText ?? "").trim();
+      if (!selectedTitle || !tagPersonalizationText) {
+        return new NextResponse("Select at least one campaign product and personalization", {
+          status: 400,
+        });
+      }
+      normalizedSelectedProducts.push({
+        selectedProductId:
+          body.selectedProductId?.trim() || selectedProduct?.shopifyProductId || null,
+        selectedProductTitle: selectedTitle,
+        selectedProductVariantId:
+          body.selectedProductVariantId?.trim() || selectedProduct?.variantId || null,
+        personalizationText: tagPersonalizationText,
+        imageUrl: selectedProduct?.imageUrl || null,
+      });
     }
-
-    const selectedId =
-      body.selectedProductId?.trim() || selectedProduct?.shopifyProductId || null;
-    const selectedVariantId =
-      body.selectedProductVariantId?.trim() || selectedProduct?.variantId || null;
+    const firstSelectedProduct = normalizedSelectedProducts[0];
+    const tagPersonalizationText = normalizedSelectedProducts
+      .map((item) => `${item.selectedProductTitle}: ${item.personalizationText}`)
+      .join("\n");
 
     const normalizedCountry =
       body.shippingCountry?.trim().toUpperCase().slice(0, 2) || "US";
@@ -169,9 +219,9 @@ export async function PATCH(
         petAge,
         petPersonality,
         tagPersonalizationText,
-        selectedProductId: selectedId,
-        selectedProductTitle: selectedTitle,
-        selectedProductVariantId: selectedVariantId,
+        selectedProductId: firstSelectedProduct.selectedProductId,
+        selectedProductTitle: firstSelectedProduct.selectedProductTitle,
+        selectedProductVariantId: firstSelectedProduct.selectedProductVariantId,
         petInfoSubmittedAt: new Date(),
         onboardingSubmittedAt: new Date(),
         updatedAt: new Date(),
@@ -191,7 +241,11 @@ export async function PATCH(
 
     const orderNotes = [
       "Campaign onboarding confirmed by influencer.",
-      `Tag personalization: ${tagPersonalizationText}`,
+      "Selected products and personalization:",
+      ...normalizedSelectedProducts.map(
+        (item, index) =>
+          `${index + 1}. ${item.selectedProductTitle} — ${item.personalizationText}`
+      ),
       `Pet: ${petName} (${petBreed}, ${petAge})`,
       `Personality: ${petPersonality}`,
     ].join("\n");
@@ -200,14 +254,13 @@ export async function PATCH(
       await db
         .update(shipments)
         .set({
-          products: [
-            {
-              name: selectedTitle,
-              qty: 1,
-              shopifyProductId: selectedId ?? undefined,
-              variant: selectedVariantId ?? undefined,
-            },
-          ],
+          products: normalizedSelectedProducts.map((item) => ({
+            name: item.selectedProductTitle,
+            qty: 1,
+            shopifyProductId: item.selectedProductId ?? undefined,
+            variant: item.selectedProductVariantId ?? undefined,
+            personalizationText: item.personalizationText,
+          })),
           notes: orderNotes,
           updatedAt: new Date(),
         })
@@ -217,14 +270,13 @@ export async function PATCH(
         influencerProfileId: profile.id,
         campaignId: id,
         status: "preparing",
-        products: [
-          {
-            name: selectedTitle,
-            qty: 1,
-            shopifyProductId: selectedId ?? undefined,
-            variant: selectedVariantId ?? undefined,
-          },
-        ],
+        products: normalizedSelectedProducts.map((item) => ({
+          name: item.selectedProductTitle,
+          qty: 1,
+          shopifyProductId: item.selectedProductId ?? undefined,
+          variant: item.selectedProductVariantId ?? undefined,
+          personalizationText: item.personalizationText,
+        })),
         notes: orderNotes,
       });
     }

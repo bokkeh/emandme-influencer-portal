@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Circle } from "lucide-react";
+import { Check, CheckCircle2, Circle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ type CampaignProduct = {
   shopifyProductId?: string;
   title: string;
   imageUrl?: string;
+  imageUrls?: string[];
   variantId?: string;
 };
 
@@ -79,9 +80,10 @@ export function CampaignProgressCard({
   const [petAge, setPetAge] = useState(initialPetInfo.petAge);
   const [petPersonality, setPetPersonality] = useState(initialPetInfo.petPersonality);
 
-  const defaultSelectedProductId =
-    initialPetInfo.selectedProductId || campaignProducts[0]?.shopifyProductId || campaignProducts[0]?.title || "";
-  const [selectedProductId, setSelectedProductId] = useState(defaultSelectedProductId);
+  const defaultSelectedProductId = initialPetInfo.selectedProductId || "";
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>(
+    defaultSelectedProductId ? [defaultSelectedProductId] : []
+  );
   const [personalizationByProduct, setPersonalizationByProduct] = useState<Record<string, string>>(
     defaultSelectedProductId
       ? {
@@ -93,12 +95,15 @@ export function CampaignProgressCard({
   const completed = checklist.filter((item) => item.done).length;
   const percent = Math.round((completed / checklist.length) * 100);
 
-  const selectedProduct = useMemo(() => {
-    return (
-      campaignProducts.find((p) => (p.shopifyProductId || p.title) === selectedProductId) || null
+  const hasMissingPersonalization = selectedProductIds.some(
+    (id) => !(personalizationByProduct[id] ?? "").trim()
+  );
+
+  function toggleSelectedProduct(id: string) {
+    setSelectedProductIds((prev) =>
+      prev.includes(id) ? prev.filter((current) => current !== id) : [...prev, id]
     );
-  }, [campaignProducts, selectedProductId]);
-  const selectedPersonalization = selectedProductId ? (personalizationByProduct[selectedProductId] ?? "") : "";
+  }
 
   async function submitCampaignOnboarding() {
     if (!canSubmitPetInfo) {
@@ -122,8 +127,8 @@ export function CampaignProgressCard({
       !petBreed.trim() ||
       !petAge.trim() ||
       !petPersonality.trim() ||
-      !selectedPersonalization.trim() ||
-      !selectedProduct
+      selectedProductIds.length === 0 ||
+      hasMissingPersonalization
     ) {
       toast.error("Please complete all required onboarding fields.");
       return;
@@ -148,10 +153,26 @@ export function CampaignProgressCard({
           petBreed,
           petAge,
           petPersonality,
-          tagPersonalizationText: selectedPersonalization,
-          selectedProductId: selectedProduct.shopifyProductId ?? null,
-          selectedProductTitle: selectedProduct.title,
-          selectedProductVariantId: selectedProduct.variantId ?? null,
+          tagPersonalizationText: selectedProductIds
+            .map((id) => {
+              const product = campaignProducts.find((p, index) => (p.shopifyProductId || p.title || `product-${index}`) === id);
+              const productTitle = product?.title ?? id;
+              return `${productTitle}: ${personalizationByProduct[id] ?? ""}`;
+            })
+            .join("\n"),
+          selectedProducts: selectedProductIds
+            .map((id) => {
+              const product = campaignProducts.find((p, index) => (p.shopifyProductId || p.title || `product-${index}`) === id);
+              if (!product) return null;
+              return {
+                selectedProductId: product.shopifyProductId ?? null,
+                selectedProductTitle: product.title,
+                selectedProductVariantId: product.variantId ?? null,
+                personalizationText: personalizationByProduct[id] ?? "",
+                imageUrl: product.imageUrl ?? null,
+              };
+            })
+            .filter(Boolean),
         }),
       });
       if (!res.ok) throw new Error((await res.text()) || "Failed to submit onboarding");
@@ -263,15 +284,16 @@ export function CampaignProgressCard({
             {campaignProducts.length === 0 ? (
               <p className="text-xs text-gray-500">No products have been added to this campaign yet.</p>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {campaignProducts.map((product, index) => {
                   const value = product.shopifyProductId || product.title || `product-${index}`;
-                  const isSelected = selectedProductId === value;
+                  const isSelected = selectedProductIds.includes(value);
+                  const imageUrls = (product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : []);
                   return (
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setSelectedProductId(value)}
+                      onClick={() => toggleSelectedProduct(value)}
                       disabled={!canSubmitPetInfo || saving}
                       className={`rounded-lg border bg-white text-left transition ${
                         isSelected
@@ -279,20 +301,37 @@ export function CampaignProgressCard({
                           : "border-gray-200 hover:border-rose-300"
                       }`}
                     >
-                      <div className="aspect-square w-full overflow-hidden rounded-t-lg bg-gray-100">
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.title}
-                            className="h-full w-full object-cover"
-                          />
+                      <div className="relative rounded-t-lg bg-gray-100">
+                        {imageUrls.length > 0 ? (
+                          <div className="flex aspect-[4/3] w-full snap-x snap-mandatory overflow-x-auto">
+                            {imageUrls.map((url, imageIndex) => (
+                              <div
+                                key={`${value}-image-${imageIndex}`}
+                                className="h-full w-full shrink-0 snap-center"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`${product.title} ${imageIndex + 1}`}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                          <div className="flex aspect-[4/3] h-full w-full items-center justify-center text-xs text-gray-400">
                             No image
                           </div>
                         )}
+                        <div className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded border bg-white">
+                          {isSelected ? <Check className="h-4 w-4 text-rose-600" /> : null}
+                        </div>
                       </div>
-                      <div className="space-y-2 p-3">
+                      {imageUrls.length > 1 ? (
+                        <div className="px-3 pb-1 pt-2 text-[11px] text-gray-500">
+                          Swipe image carousel to view all product photos
+                        </div>
+                      ) : null}
+                      <div className="space-y-2 px-3 pb-3">
                         <p className="text-sm font-semibold text-gray-900">{product.title}</p>
                         <div>
                           <Label className="text-xs">Tag personalization *</Label>

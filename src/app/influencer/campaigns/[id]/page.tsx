@@ -281,6 +281,7 @@ export default async function InfluencerCampaignDetailPage({
             shopifyProductId?: string;
             title: string;
             imageUrl?: string;
+            imageUrls?: string[];
             variantId?: string;
           }>) ?? [])
         }

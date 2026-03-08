@@ -54,6 +54,9 @@ type ShopifyProductsQuery = {
         title: string;
         handle: string;
         featuredImage: { url: string } | null;
+        images: {
+          edges: Array<{ node: { url: string } }>;
+        };
         variants: {
           edges: Array<{ node: { id: string; title: string } }>;
         };
@@ -83,6 +86,13 @@ export async function GET(req: Request) {
                 featuredImage {
                   url
                 }
+                images(first: 10) {
+                  edges {
+                    node {
+                      url
+                    }
+                  }
+                }
                 variants(first: 1) {
                   edges {
                     node {
@@ -104,6 +114,7 @@ export async function GET(req: Request) {
       title: node.title,
       handle: node.handle,
       imageUrl: node.featuredImage?.url ?? null,
+      imageUrls: node.images.edges.map((edge) => edge.node.url).filter(Boolean),
       variantId: node.variants.edges[0]?.node.id ?? null,
     }));
 
@@ -113,4 +124,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
