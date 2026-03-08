@@ -43,10 +43,14 @@ export async function PATCH(
       .select({
         status: campaignInfluencers.status,
         influencerName: influencerProfiles.displayName,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
         campaignTitle: campaigns.title,
       })
       .from(campaignInfluencers)
       .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
+      .innerJoin(users, eq(influencerProfiles.userId, users.id))
       .innerJoin(campaigns, eq(campaignInfluencers.campaignId, campaigns.id))
       .where(and(eq(campaignInfluencers.id, enrollmentId), eq(campaignInfluencers.campaignId, id)))
       .limit(1);
@@ -103,7 +107,10 @@ export async function PATCH(
       priorStatus !== nextStatus &&
       (nextStatus === "accepted" || nextStatus === "declined")
     ) {
-      const influencerName = (existing.influencerName ?? "").trim() || "Influencer";
+      const influencerName =
+        (existing.influencerName ?? "").trim() ||
+        `${existing.userFirstName ?? ""} ${existing.userLastName ?? ""}`.trim() ||
+        existing.userEmail;
       googleChat
         .campaignEnrollmentDecision(existing.campaignTitle, influencerName, nextStatus)
         .catch(() => {});

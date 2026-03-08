@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { stripe } from "@/lib/stripe/client";
-import { db, influencerProfiles, payments } from "@/lib/db";
+import { db, influencerProfiles, payments, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { googleChat } from "@/lib/notifications/google-chat";
 
@@ -43,7 +43,30 @@ export async function POST(req: Request) {
         .set({ status: "failed", updatedAt: new Date() })
         .where(eq(payments.id, paymentId));
 
-      await googleChat.paymentFailed("Influencer", String((transfer.amount ?? 0) / 100), transfer.failure_message ?? undefined);
+      const [payment] = await db
+        .select({
+          influencerName: influencerProfiles.displayName,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+        })
+        .from(payments)
+        .innerJoin(influencerProfiles, eq(payments.influencerProfileId, influencerProfiles.id))
+        .innerJoin(users, eq(influencerProfiles.userId, users.id))
+        .where(eq(payments.id, paymentId))
+        .limit(1);
+
+      const influencerName =
+        (payment?.influencerName ?? "").trim() ||
+        `${payment?.userFirstName ?? ""} ${payment?.userLastName ?? ""}`.trim() ||
+        payment?.userEmail ||
+        "Unknown Creator";
+
+      await googleChat.paymentFailed(
+        influencerName,
+        String((transfer.amount ?? 0) / 100),
+        transfer.failure_message ?? undefined
+      );
     }
   }
 

@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { db, assets } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { db, assets, influencerProfiles, users, campaigns } from "@/lib/db";
 import { googleChat } from "@/lib/notifications/google-chat";
 
 export async function POST(req: Request) {
@@ -42,10 +43,37 @@ export async function POST(req: Request) {
     })
     .returning();
 
-  // Notify Google Chat
+  const [influencer] = await db
+    .select({
+      displayName: influencerProfiles.displayName,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(influencerProfiles)
+    .innerJoin(users, eq(influencerProfiles.userId, users.id))
+    .where(eq(influencerProfiles.id, influencerProfileId))
+    .limit(1);
+
+  const [campaign] = campaignId
+    ? await db
+        .select({ title: campaigns.title })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId))
+        .limit(1)
+    : [];
+
+  const influencerName =
+    (influencer?.displayName ?? "").trim() ||
+    `${influencer?.firstName ?? ""} ${influencer?.lastName ?? ""}`.trim() ||
+    influencer?.email ||
+    "Unknown Creator";
+
+  const campaignTitle = campaign?.title ?? "Portal Upload";
+
   await googleChat.assetSubmitted(
-    "Influencer",
-    "Portal Upload",
+    influencerName,
+    campaignTitle,
     platform ?? "unknown"
   );
 
