@@ -1,3 +1,8 @@
+import {
+  getGoogleChatNotificationSettings,
+} from "@/lib/notifications/google-chat-settings";
+import { type GoogleChatNotificationEvent } from "@/lib/notifications/google-chat-settings-shared";
+
 const WEBHOOK_URL = process.env.GOOGLE_CHAT_WEBHOOK_URL;
 
 type CardSection = {
@@ -14,11 +19,19 @@ type Card = {
   sections: CardSection[];
 };
 
-async function sendChatCard(card: Card) {
+async function shouldSend(event: GoogleChatNotificationEvent) {
   if (!WEBHOOK_URL) {
-    console.warn("[Google Chat] GOOGLE_CHAT_WEBHOOK_URL not set — skipping notification");
-    return;
+    console.warn("[Google Chat] GOOGLE_CHAT_WEBHOOK_URL not set - skipping notification");
+    return false;
   }
+
+  const settings = await getGoogleChatNotificationSettings();
+  return settings[event] ?? true;
+}
+
+async function sendChatCard(card: Card) {
+  if (!WEBHOOK_URL) return;
+
   try {
     const res = await fetch(WEBHOOK_URL, {
       method: "POST",
@@ -27,30 +40,34 @@ async function sendChatCard(card: Card) {
         cardsV2: [{ cardId: crypto.randomUUID(), card }],
       }),
     });
+
     if (!res.ok) {
       console.error("[Google Chat] Failed to send notification:", await res.text());
     }
-  } catch (err) {
-    console.error("[Google Chat] Error sending notification:", err);
+  } catch (error) {
+    console.error("[Google Chat] Error sending notification:", error);
   }
 }
 
 async function sendText(text: string) {
   if (!WEBHOOK_URL) return;
+
   try {
     await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
-  } catch (err) {
-    console.error("[Google Chat] Error sending text notification:", err);
+  } catch (error) {
+    console.error("[Google Chat] Error sending text notification:", error);
   }
 }
 
 export const googleChat = {
-  influencerJoined: (name: string, tier: string, platforms: string[]) =>
-    sendChatCard({
+  influencerJoined: async (name: string, tier: string, platforms: string[]) => {
+    if (!(await shouldSend("influencer_joined"))) return;
+
+    return sendChatCard({
       header: {
         title: `New Influencer Joined: ${name}`,
         subtitle: `Tier: ${tier} | Platforms: ${platforms.join(", ")}`,
@@ -66,10 +83,13 @@ export const googleChat = {
           ],
         },
       ],
-    }),
+    });
+  },
 
-  assetSubmitted: (influencerName: string, campaignTitle: string, platform: string) =>
-    sendChatCard({
+  assetSubmitted: async (influencerName: string, campaignTitle: string, platform: string) => {
+    if (!(await shouldSend("asset_submitted"))) return;
+
+    return sendChatCard({
       header: {
         title: "New UGC Asset Submitted",
         subtitle: `By ${influencerName} for ${campaignTitle}`,
@@ -85,41 +105,64 @@ export const googleChat = {
             },
             {
               textParagraph: {
-                text: "Review the asset in the Admin Portal → Assets section.",
+                text: "Review the asset in the Admin Portal -> Assets section.",
               },
             },
           ],
         },
       ],
-    }),
+    });
+  },
 
-  paymentProcessed: (influencerName: string, amount: string, currency: string) =>
-    sendText(
-      `✅ Payment sent: ${currency.toUpperCase()} ${amount} to ${influencerName} via Stripe`
-    ),
+  paymentProcessed: async (influencerName: string, amount: string, currency: string) => {
+    if (!(await shouldSend("payment_processed"))) return;
 
-  paymentFailed: (influencerName: string, amount: string, reason?: string) =>
-    sendText(
-      `⚠️ Payout FAILED: ${amount} to ${influencerName}${reason ? ` — ${reason}` : ""}. Check the Stripe dashboard.`
-    ),
+    return sendText(
+      `[PAID] Payment sent: ${currency.toUpperCase()} ${amount} to ${influencerName} via Stripe`
+    );
+  },
 
-  shipmentReminder: (influencerName: string, campaignTitle: string, daysOverdue: number) =>
-    sendText(
-      `📦 Shipping Reminder: Product for ${influencerName} (${campaignTitle}) has not been shipped — ${daysOverdue > 0 ? `${daysOverdue} days overdue` : "due soon"}. Please ship ASAP.`
-    ),
+  paymentFailed: async (influencerName: string, amount: string, reason?: string) => {
+    if (!(await shouldSend("payment_failed"))) return;
 
-  campaignMilestone: (campaignTitle: string, milestone: string) =>
-    sendText(`🎉 Campaign milestone: "${campaignTitle}" — ${milestone}`),
+    return sendText(
+      `[FAILED] Payout failed: ${amount} to ${influencerName}${reason ? ` - ${reason}` : ""}. Check Stripe.`
+    );
+  },
 
-  campaignSignupRequested: (campaignTitle: string, influencerName: string) =>
-    sendText(`📝 Campaign signup request: ${influencerName} joined "${campaignTitle}" (pending approval).`),
+  shipmentReminder: async (influencerName: string, campaignTitle: string, daysOverdue: number) => {
+    if (!(await shouldSend("shipment_reminder"))) return;
 
-  campaignEnrollmentDecision: (
+    return sendText(
+      `[SHIPMENT] Product for ${influencerName} (${campaignTitle}) has not been shipped - ${
+        daysOverdue > 0 ? `${daysOverdue} days overdue` : "due soon"
+      }.`
+    );
+  },
+
+  campaignMilestone: async (campaignTitle: string, milestone: string) => {
+    if (!(await shouldSend("campaign_milestone"))) return;
+    return sendText(`[MILESTONE] "${campaignTitle}" - ${milestone}`);
+  },
+
+  campaignSignupRequested: async (campaignTitle: string, influencerName: string) => {
+    if (!(await shouldSend("campaign_signup_requested"))) return;
+    return sendText(`[SIGNUP] ${influencerName} joined "${campaignTitle}" (pending approval).`);
+  },
+
+  campaignEnrollmentDecision: async (
     campaignTitle: string,
     influencerName: string,
     decision: "accepted" | "declined"
-  ) =>
-    sendText(
-      `${decision === "accepted" ? "✅" : "❌"} Campaign enrollment ${decision}: ${influencerName} in "${campaignTitle}".`
-    ),
+  ) => {
+    const event =
+      decision === "accepted"
+        ? "campaign_enrollment_accepted"
+        : "campaign_enrollment_declined";
+    if (!(await shouldSend(event))) return;
+
+    return sendText(
+      `[ENROLLMENT ${decision.toUpperCase()}] ${influencerName} in "${campaignTitle}".`
+    );
+  },
 };

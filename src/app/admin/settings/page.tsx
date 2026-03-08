@@ -1,11 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { FaviconSettingsCard } from "@/components/admin/FaviconSettingsCard";
 import { HubSpotSyncTestCard } from "@/components/admin/HubSpotSyncTestCard";
+import { GoogleChatNotificationSettingsCard } from "@/components/admin/GoogleChatNotificationSettingsCard";
 
 export default function SettingsPage() {
   return (
@@ -18,7 +15,6 @@ export default function SettingsPage() {
       <FaviconSettingsCard />
       <HubSpotSyncTestCard />
 
-      {/* HubSpot */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -47,7 +43,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Shopify */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -72,7 +67,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Stripe */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -97,31 +91,8 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Google Chat */}
-      <Card className="border border-gray-200 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Google Chat</CardTitle>
-              <CardDescription>Receive notifications in your team chat space</CardDescription>
-            </div>
-            <Badge className={process.env.GOOGLE_CHAT_WEBHOOK_URL ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-600"}>
-              {process.env.GOOGLE_CHAT_WEBHOOK_URL ? "Configured" : "Not Configured"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-gray-500">
-            Create a webhook in your Google Chat space: Right-click space → Manage webhooks → Add webhook → Copy URL.
-            Then set <code className="bg-gray-100 px-1 rounded text-xs">GOOGLE_CHAT_WEBHOOK_URL</code> in your environment.
-          </p>
-          <p className="text-xs text-gray-400">
-            Notifications sent for: new influencer joined, asset submitted, payment processed/failed, shipping reminders.
-          </p>
-        </CardContent>
-      </Card>
+      <GoogleChatNotificationSettingsCard />
 
-      {/* Clerk */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Clerk Auth</CardTitle>
