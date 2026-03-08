@@ -5,13 +5,26 @@ import { googleChat } from "@/lib/notifications/google-chat";
 import { db, payments, influencerProfiles, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
+async function requireAdminApi() {
+  const { userId, sessionClaims } = await auth();
+  if (!userId) return { ok: false as const, status: 401, message: "Unauthorized" };
+
+  let role = (sessionClaims?.metadata as { role?: string })?.role;
+  if (role !== "admin") {
+    const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
+    role = dbUser?.role;
+  }
+
+  if (role !== "admin") return { ok: false as const, status: 403, message: "Forbidden" };
+  return { ok: true as const };
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { sessionClaims } = await auth();
-  const role = (sessionClaims?.metadata as { role?: string })?.role;
-  if (role !== "admin") return new NextResponse("Forbidden", { status: 403 });
+  const guard = await requireAdminApi();
+  if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
 
   const { id } = await params;
 

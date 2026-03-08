@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { KPICard } from "@/components/admin/KPICard";
 import { CreatePaymentDialog } from "@/components/admin/CreatePaymentDialog";
+import { TriggerPayoutButton } from "@/components/admin/TriggerPayoutButton";
 import { CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -132,14 +133,7 @@ export default async function PaymentsPage() {
                       </TableCell>
                       <TableCell>
                         {p.status === "pending" && p.stripePayoutsEnabled && (
-                          <form action={`/api/payments/${p.id}/trigger`} method="POST">
-                            <button
-                              type="submit"
-                              className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-                            >
-                              Send Payout
-                            </button>
-                          </form>
+                          <TriggerPayoutButton paymentId={p.id} />
                         )}
                         {p.stripeTransferId && (
                           <span className="font-mono text-xs text-gray-400">{p.stripeTransferId.slice(0, 16)}…</span>
