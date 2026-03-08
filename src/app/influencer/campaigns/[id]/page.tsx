@@ -47,6 +47,7 @@ export default async function InfluencerCampaignDetailPage({
       phone: influencerProfiles.phone,
       niche: influencerProfiles.niche,
       shippingAddressLine1: influencerProfiles.shippingAddressLine1,
+      shippingAddressLine2: influencerProfiles.shippingAddressLine2,
       shippingCity: influencerProfiles.shippingCity,
       shippingState: influencerProfiles.shippingState,
       shippingPostalCode: influencerProfiles.shippingPostalCode,
@@ -72,6 +73,9 @@ export default async function InfluencerCampaignDetailPage({
       petAge: campaignInfluencers.petAge,
       petPersonality: campaignInfluencers.petPersonality,
       tagPersonalizationText: campaignInfluencers.tagPersonalizationText,
+      selectedProductId: campaignInfluencers.selectedProductId,
+      selectedProductTitle: campaignInfluencers.selectedProductTitle,
+      selectedProductVariantId: campaignInfluencers.selectedProductVariantId,
       campaignTitle: campaigns.title,
       campaignDescription: campaigns.description,
       campaignStatus: campaigns.status,
@@ -207,7 +211,7 @@ export default async function InfluencerCampaignDetailPage({
             {enrollment.contentDueDate && (
               <div>
                 <p className="text-xs text-gray-400 font-medium">CONTENT DUE</p>
-                <p className="text-lg font-bold text-gray-900">{format(new Date(enrollment.contentDueDate), "MMM d, yyyy")}</p>
+                <p className="content-due-gradient mt-1 text-lg font-bold">{format(new Date(enrollment.contentDueDate), "MMM d, yyyy")}</p>
               </div>
             )}
             {enrollment.startDate && (
@@ -269,15 +273,37 @@ export default async function InfluencerCampaignDetailPage({
 
       <CampaignProgressCard
         campaignId={id}
-        canSubmitPetInfo={joinedCampaign && profileComplete}
+        canSubmitPetInfo={joinedCampaign}
         profileComplete={profileComplete}
         checklist={checklist}
+        campaignProducts={
+          ((enrollment.products as Array<{
+            shopifyProductId?: string;
+            title: string;
+            imageUrl?: string;
+            variantId?: string;
+          }>) ?? [])
+        }
+        initialProfileInfo={{
+          displayName: profile.displayName ?? "",
+          phone: profile.phone ?? "",
+          niche: profile.niche ?? "",
+          shippingAddressLine1: profile.shippingAddressLine1 ?? "",
+          shippingAddressLine2: profile.shippingAddressLine2 ?? "",
+          shippingCity: profile.shippingCity ?? "",
+          shippingState: profile.shippingState ?? "",
+          shippingPostalCode: profile.shippingPostalCode ?? "",
+          shippingCountry: profile.shippingCountry ?? "US",
+        }}
         initialPetInfo={{
           petName: enrollment.petName ?? "",
           petBreed: enrollment.petBreed ?? "",
           petAge: enrollment.petAge ?? "",
           petPersonality: enrollment.petPersonality ?? "",
           tagPersonalizationText: enrollment.tagPersonalizationText ?? "",
+          selectedProductId: enrollment.selectedProductId ?? "",
+          selectedProductTitle: enrollment.selectedProductTitle ?? "",
+          selectedProductVariantId: enrollment.selectedProductVariantId ?? "",
         }}
       />
 

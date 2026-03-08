@@ -224,6 +224,11 @@ export default async function CampaignDetailPage({
     Object.values(briefContent).some((value) =>
       typeof value === "string" ? value.replace(/<[^>]*>/g, "").trim().length > 0 : false
     );
+  const deliverablesHtml = (briefContent.deliverables ?? "").trim();
+  const deliverablesText = deliverablesHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const briefShareUrl = campaign.briefShareToken
+    ? `${(process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "")}/brief/${campaign.briefShareToken}`
+    : "";
 
   const launchChecklistItems = [
     {
@@ -287,10 +292,23 @@ export default async function CampaignDetailPage({
                 </div>
                 {campaign.status !== "draft" ? <StatusBadge status={campaign.status} /> : null}
               </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {campaign.platforms.map((p) => (
                   <PlatformBadge key={p} platform={p} />
                 ))}
+                {briefShareUrl ? (
+                  <a href={briefShareUrl} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline">
+                      View Campaign Brief
+                    </Button>
+                  </a>
+                ) : campaign.briefUrl ? (
+                  <a href={campaign.briefUrl} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline">
+                      View Campaign Brief
+                    </Button>
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>
@@ -321,6 +339,13 @@ export default async function CampaignDetailPage({
               {campaign.startDate ? format(new Date(campaign.startDate), "MMM d, yyyy") : null}
               {campaign.startDate && campaign.endDate ? " - " : ""}
               {campaign.endDate ? format(new Date(campaign.endDate), "MMM d, yyyy") : null}
+            </div>
+          ) : null}
+
+          {deliverablesText ? (
+            <div className="mt-4 rounded-lg border border-rose-100 bg-rose-50/50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Deliverables</p>
+              <p className="mt-1 text-sm text-rose-900">{deliverablesText}</p>
             </div>
           ) : null}
         </CardContent>

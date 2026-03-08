@@ -453,7 +453,11 @@ export const campaignInfluencers = pgTable(
     petAge: varchar("pet_age", { length: 40 }),
     petPersonality: text("pet_personality"),
     tagPersonalizationText: text("tag_personalization_text"),
+    selectedProductId: text("selected_product_id"),
+    selectedProductTitle: text("selected_product_title"),
+    selectedProductVariantId: text("selected_product_variant_id"),
     petInfoSubmittedAt: timestamp("pet_info_submitted_at", { withTimezone: true }),
+    onboardingSubmittedAt: timestamp("onboarding_submitted_at", { withTimezone: true }),
 
     enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

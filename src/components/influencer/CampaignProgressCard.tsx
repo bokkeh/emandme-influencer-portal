@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, Circle } from "lucide-react";
@@ -10,10 +10,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ChecklistItem = {
   label: string;
   done: boolean;
+};
+
+type CampaignProduct = {
+  shopifyProductId?: string;
+  title: string;
+  imageUrl?: string;
+  variantId?: string;
 };
 
 type Props = {
@@ -21,12 +35,27 @@ type Props = {
   canSubmitPetInfo: boolean;
   profileComplete: boolean;
   checklist: ChecklistItem[];
+  campaignProducts: CampaignProduct[];
+  initialProfileInfo: {
+    displayName: string;
+    phone: string;
+    niche: string;
+    shippingAddressLine1: string;
+    shippingAddressLine2: string;
+    shippingCity: string;
+    shippingState: string;
+    shippingPostalCode: string;
+    shippingCountry: string;
+  };
   initialPetInfo: {
     petName: string;
     petBreed: string;
     petAge: string;
     petPersonality: string;
     tagPersonalizationText: string;
+    selectedProductId: string;
+    selectedProductTitle: string;
+    selectedProductVariantId: string;
   };
 };
 
@@ -35,43 +64,101 @@ export function CampaignProgressCard({
   canSubmitPetInfo,
   profileComplete,
   checklist,
+  campaignProducts,
+  initialProfileInfo,
   initialPetInfo,
 }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+
+  const [displayName, setDisplayName] = useState(initialProfileInfo.displayName);
+  const [phone, setPhone] = useState(initialProfileInfo.phone);
+  const [niche, setNiche] = useState(initialProfileInfo.niche);
+  const [shippingAddressLine1, setShippingAddressLine1] = useState(initialProfileInfo.shippingAddressLine1);
+  const [shippingAddressLine2, setShippingAddressLine2] = useState(initialProfileInfo.shippingAddressLine2);
+  const [shippingCity, setShippingCity] = useState(initialProfileInfo.shippingCity);
+  const [shippingState, setShippingState] = useState(initialProfileInfo.shippingState);
+  const [shippingPostalCode, setShippingPostalCode] = useState(initialProfileInfo.shippingPostalCode);
+  const [shippingCountry, setShippingCountry] = useState(initialProfileInfo.shippingCountry || "US");
+
   const [petName, setPetName] = useState(initialPetInfo.petName);
   const [petBreed, setPetBreed] = useState(initialPetInfo.petBreed);
   const [petAge, setPetAge] = useState(initialPetInfo.petAge);
   const [petPersonality, setPetPersonality] = useState(initialPetInfo.petPersonality);
   const [tagPersonalizationText, setTagPersonalizationText] = useState(initialPetInfo.tagPersonalizationText);
 
+  const defaultSelectedProductId =
+    initialPetInfo.selectedProductId || campaignProducts[0]?.shopifyProductId || campaignProducts[0]?.title || "";
+  const [selectedProductId, setSelectedProductId] = useState(defaultSelectedProductId);
+
   const completed = checklist.filter((item) => item.done).length;
   const percent = Math.round((completed / checklist.length) * 100);
 
-  async function submitPetInfo() {
-    if (!petName.trim() || !petBreed.trim() || !petAge.trim() || !petPersonality.trim() || !tagPersonalizationText.trim()) {
-      toast.error("Please complete all pet info fields.");
+  const selectedProduct = useMemo(() => {
+    return (
+      campaignProducts.find((p) => (p.shopifyProductId || p.title) === selectedProductId) || null
+    );
+  }, [campaignProducts, selectedProductId]);
+
+  async function submitCampaignOnboarding() {
+    if (!canSubmitPetInfo) {
+      toast.error(
+        profileComplete
+          ? "Your enrollment is not approved yet."
+          : "Please complete your profile first."
+      );
+      return;
+    }
+
+    if (
+      !displayName.trim() ||
+      !phone.trim() ||
+      !niche.trim() ||
+      !shippingAddressLine1.trim() ||
+      !shippingCity.trim() ||
+      !shippingState.trim() ||
+      !shippingPostalCode.trim() ||
+      !petName.trim() ||
+      !petBreed.trim() ||
+      !petAge.trim() ||
+      !petPersonality.trim() ||
+      !tagPersonalizationText.trim() ||
+      !selectedProduct
+    ) {
+      toast.error("Please complete all required onboarding fields.");
       return;
     }
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/influencer/campaigns/${campaignId}/pet-info`, {
+      const res = await fetch(`/api/influencer/campaigns/${campaignId}/onboarding`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          displayName,
+          phone,
+          niche,
+          shippingAddressLine1,
+          shippingAddressLine2,
+          shippingCity,
+          shippingState,
+          shippingPostalCode,
+          shippingCountry,
           petName,
           petBreed,
           petAge,
           petPersonality,
           tagPersonalizationText,
+          selectedProductId: selectedProduct.shopifyProductId ?? null,
+          selectedProductTitle: selectedProduct.title,
+          selectedProductVariantId: selectedProduct.variantId ?? null,
         }),
       });
-      if (!res.ok) throw new Error((await res.text()) || "Failed to submit pet info");
-      toast.success("Pet tag info submitted");
+      if (!res.ok) throw new Error((await res.text()) || "Failed to submit onboarding");
+      toast.success("Onboarding complete. Your order request has been sent to shipping.");
       router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit pet info";
+      const message = error instanceof Error ? error.message : "Failed to submit onboarding";
       toast.error(message);
     } finally {
       setSaving(false);
@@ -103,55 +190,114 @@ export function CampaignProgressCard({
           ))}
         </div>
 
-        <div className="space-y-3 rounded-md border border-gray-200 p-3">
-          <p className="text-sm font-semibold text-gray-900">Pet Tag Information</p>
+        <div className="space-y-4 rounded-md border border-gray-200 p-3">
+          <p className="text-sm font-semibold text-gray-900">Campaign Onboarding</p>
           {!canSubmitPetInfo ? (
             <p className="text-xs text-amber-700">
               {profileComplete
-                ? "Your enrollment is not approved yet. You can submit pet details after approval."
-                : "Please complete your profile first, then submit your pet details."}
+                ? "Your enrollment is not approved yet. You can submit after approval."
+                : "Please complete your profile first, then submit campaign details."}
             </p>
           ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>Pet name</Label>
+              <Label>Display name *</Label>
+              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div>
+              <Label>Phone *</Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div>
+              <Label>Niche *</Label>
+              <Input value={niche} onChange={(e) => setNiche(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div>
+              <Label>Country *</Label>
+              <Input value={shippingCountry} onChange={(e) => setShippingCountry(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Shipping Address *</Label>
+              <Input value={shippingAddressLine1} onChange={(e) => setShippingAddressLine1(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Address line 2</Label>
+              <Input value={shippingAddressLine2} onChange={(e) => setShippingAddressLine2(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div>
+              <Label>City *</Label>
+              <Input value={shippingCity} onChange={(e) => setShippingCity(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div>
+              <Label>State *</Label>
+              <Input value={shippingState} onChange={(e) => setShippingState(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+            <div>
+              <Label>Postal code *</Label>
+              <Input value={shippingPostalCode} onChange={(e) => setShippingPostalCode(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Pet name *</Label>
               <Input value={petName} onChange={(e) => setPetName(e.target.value)} disabled={!canSubmitPetInfo || saving} />
             </div>
             <div>
-              <Label>Breed</Label>
+              <Label>Breed *</Label>
               <Input value={petBreed} onChange={(e) => setPetBreed(e.target.value)} disabled={!canSubmitPetInfo || saving} />
             </div>
             <div>
-              <Label>Age</Label>
+              <Label>Age *</Label>
               <Input value={petAge} onChange={(e) => setPetAge(e.target.value)} disabled={!canSubmitPetInfo || saving} />
             </div>
             <div className="sm:col-span-2">
-              <Label>Personality</Label>
-              <Textarea
-                rows={2}
-                value={petPersonality}
-                onChange={(e) => setPetPersonality(e.target.value)}
-                disabled={!canSubmitPetInfo || saving}
-              />
+              <Label>Personality *</Label>
+              <Textarea rows={2} value={petPersonality} onChange={(e) => setPetPersonality(e.target.value)} disabled={!canSubmitPetInfo || saving} />
             </div>
-            <div className="sm:col-span-2">
-              <Label>Tag personalization text</Label>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <Label>Select campaign tag/product *</Label>
+              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                <SelectTrigger className="w-full" disabled={!canSubmitPetInfo || saving}>
+                  <SelectValue placeholder="Select product" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaignProducts.map((product, index) => {
+                    const value = product.shopifyProductId || product.title || `product-${index}`;
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {product.title}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Tag personalization fields *</Label>
               <Textarea
-                rows={2}
+                rows={3}
                 value={tagPersonalizationText}
                 onChange={(e) => setTagPersonalizationText(e.target.value)}
                 disabled={!canSubmitPetInfo || saving}
+                placeholder="Ex: Front: BASIL | Back: Alex 555-555-5555"
               />
             </div>
           </div>
+
           <div className="flex justify-end">
             <Button
               type="button"
-              onClick={() => void submitPetInfo()}
+              onClick={() => void submitCampaignOnboarding()}
               disabled={!canSubmitPetInfo || saving}
               className="bg-rose-600 hover:bg-rose-700"
             >
-              {saving ? "Saving..." : "Submit Pet Info"}
+              {saving ? "Submitting..." : "Confirm Selection and Submit Order"}
             </Button>
           </div>
         </div>
