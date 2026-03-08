@@ -9,6 +9,7 @@ import {
   campaigns,
   shipments,
 } from "@/lib/db";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 type CampaignProduct = {
   shopifyProductId?: string;
@@ -122,7 +123,7 @@ export async function PATCH(
     }
 
     const displayName = String(body.displayName ?? "").trim();
-    const phone = String(body.phone ?? "").trim();
+    const phone = normalizePhoneE164(String(body.phone ?? "").trim());
     const niche = String(body.niche ?? "").trim();
     const shippingAddressLine1 = String(body.shippingAddressLine1 ?? "").trim();
     const shippingAddressLine2 = body.shippingAddressLine2?.trim() || null;

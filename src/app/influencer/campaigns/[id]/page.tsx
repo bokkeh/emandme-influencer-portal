@@ -165,7 +165,7 @@ export default async function InfluencerCampaignDetailPage({
     { label: "Complete your profile", done: profileComplete },
     { label: "Submitted pet tag info", done: petInfoSubmitted },
     { label: "Product shipped", done: Boolean(shipment[0]) },
-    { label: "Content submitted for approval", done: Boolean(submittedAsset[0]) },
+    { label: "Content submitted for approval", done: Boolean(submittedAsset[0]), href: `/influencer/upload?campaignId=${id}` },
     { label: "Post published", done: Boolean(publishedAsset[0]) },
     { label: "Payment sent", done: Boolean(paidPayment[0]) },
   ];
@@ -241,7 +241,66 @@ export default async function InfluencerCampaignDetailPage({
         </CardContent>
       </Card>
 
-      {/* Deliverables */}
+      {/* UTM Link & Discount Code */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Your Tracking Link</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {utmLink ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-rose-50 border border-rose-200 p-3">
+                  <p className="font-mono text-xs text-gray-700 break-all">{utmLink.fullUrl}</p>
+                </div>
+                <div className="flex gap-2">
+                  <CopyButton text={utmLink.fullUrl} label="Copy Link" />
+                  <a href={utmLink.fullUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="ghost" size="sm" className="gap-1">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Open
+                    </Button>
+                  </a>
+                </div>
+                <p className="text-xs text-gray-400">{utmLink.clicks} clicks tracked</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No tracking link assigned yet — check back soon!</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Your Discount Code</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {discountCode ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-purple-50 border border-purple-200 p-4 text-center">
+                  <p className="font-mono text-2xl font-bold text-purple-900">{discountCode.code}</p>
+                  <p className="text-sm text-purple-700 mt-1">
+                    {discountCode.discountType === "percentage"
+                      ? `${discountCode.discountValue}% off`
+                      : `$${discountCode.discountValue} off`}
+                  </p>
+                </div>
+                <CopyButton text={discountCode.code} label="Copy Code" />
+                <div className="text-xs text-gray-400">
+                  <p>{discountCode.usageCount} uses · ${Number(discountCode.revenueGenerated).toFixed(2)} revenue generated</p>
+                  {discountCode.expiresAt && (
+                    <p>Expires {format(new Date(discountCode.expiresAt), "MMM d, yyyy")}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No discount code assigned yet — check back soon!</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+{/* Deliverables */}
       {deliverables.length > 0 && (
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader>
@@ -308,64 +367,8 @@ export default async function InfluencerCampaignDetailPage({
         }}
       />
 
-      {/* UTM Link & Discount Code */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card className="border border-gray-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Your Tracking Link</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {utmLink ? (
-              <div className="space-y-3">
-                <div className="rounded-lg bg-rose-50 border border-rose-200 p-3">
-                  <p className="font-mono text-xs text-gray-700 break-all">{utmLink.fullUrl}</p>
-                </div>
-                <div className="flex gap-2">
-                  <CopyButton text={utmLink.fullUrl} label="Copy Link" />
-                  <a href={utmLink.fullUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="ghost" size="sm" className="gap-1">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Open
-                    </Button>
-                  </a>
-                </div>
-                <p className="text-xs text-gray-400">{utmLink.clicks} clicks tracked</p>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">No tracking link assigned yet — check back soon!</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border border-gray-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Your Discount Code</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {discountCode ? (
-              <div className="space-y-3">
-                <div className="rounded-lg bg-purple-50 border border-purple-200 p-4 text-center">
-                  <p className="font-mono text-2xl font-bold text-purple-900">{discountCode.code}</p>
-                  <p className="text-sm text-purple-700 mt-1">
-                    {discountCode.discountType === "percentage"
-                      ? `${discountCode.discountValue}% off`
-                      : `$${discountCode.discountValue} off`}
-                  </p>
-                </div>
-                <CopyButton text={discountCode.code} label="Copy Code" />
-                <div className="text-xs text-gray-400">
-                  <p>{discountCode.usageCount} uses · ${Number(discountCode.revenueGenerated).toFixed(2)} revenue generated</p>
-                  {discountCode.expiresAt && (
-                    <p>Expires {format(new Date(discountCode.expiresAt), "MMM d, yyyy")}</p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">No discount code assigned yet — check back soon!</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      
     </div>
   );
 }
+

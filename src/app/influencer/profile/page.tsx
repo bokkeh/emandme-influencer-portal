@@ -11,8 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 import { CreditCard, Save } from "lucide-react";
-
-const NICHES = ["beauty", "lifestyle", "fashion", "fitness", "food", "travel", "tech", "gaming", "parenting", "pets", "home_decor", "wellness"];
+import { NICHES } from "@/lib/constants/niches";
 
 export default function InfluencerProfilePage() {
   const { user } = useUser();

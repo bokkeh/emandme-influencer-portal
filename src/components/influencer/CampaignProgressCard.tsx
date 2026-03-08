@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Check, CheckCircle2, Circle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,10 +11,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { NICHES } from "@/lib/constants/niches";
+import { formatPhoneDisplay, normalizePhoneE164 } from "@/lib/phone";
 
 type ChecklistItem = {
   label: string;
   done: boolean;
+  href?: string;
 };
 
 type CampaignProduct = {
@@ -66,7 +77,7 @@ export function CampaignProgressCard({
   const [saving, setSaving] = useState(false);
 
   const [displayName, setDisplayName] = useState(initialProfileInfo.displayName);
-  const [phone, setPhone] = useState(initialProfileInfo.phone);
+  const [phone, setPhone] = useState(formatPhoneDisplay(initialProfileInfo.phone));
   const [niche, setNiche] = useState(initialProfileInfo.niche);
   const [shippingAddressLine1, setShippingAddressLine1] = useState(initialProfileInfo.shippingAddressLine1);
   const [shippingAddressLine2, setShippingAddressLine2] = useState(initialProfileInfo.shippingAddressLine2);
@@ -141,7 +152,7 @@ export function CampaignProgressCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName,
-          phone,
+          phone: normalizePhoneE164(phone),
           niche,
           shippingAddressLine1,
           shippingAddressLine2,
@@ -176,7 +187,12 @@ export function CampaignProgressCard({
         }),
       });
       if (!res.ok) throw new Error((await res.text()) || "Failed to submit onboarding");
-      toast.success("Onboarding complete. Your order request has been sent to shipping.");
+      toast.success("Order submitted. Next step: upload your content for approval.", {
+        action: {
+          label: "Go to Upload",
+          onClick: () => router.push(`/influencer/upload?campaignId=${campaignId}`),
+        },
+      });
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit onboarding";
@@ -206,7 +222,16 @@ export function CampaignProgressCard({
           {checklist.map((item) => (
             <div key={item.label} className="flex items-center gap-2 text-sm">
               {item.done ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
-              <span className={item.done ? "text-gray-800" : "text-gray-500"}>{item.label}</span>
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  className={`${item.done ? "text-gray-800" : "text-gray-500"} underline decoration-dotted underline-offset-2 hover:text-rose-600`}
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <span className={item.done ? "text-gray-800" : "text-gray-500"}>{item.label}</span>
+              )}
             </div>
           ))}
         </div>
@@ -228,11 +253,30 @@ export function CampaignProgressCard({
             </div>
             <div>
               <Label>Phone *</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(formatPhoneDisplay(e.target.value))}
+                disabled={!canSubmitPetInfo || saving}
+              />
             </div>
             <div>
               <Label>Niche *</Label>
-              <Input value={niche} onChange={(e) => setNiche(e.target.value)} disabled={!canSubmitPetInfo || saving} />
+              <Select
+                value={niche}
+                onValueChange={setNiche}
+                disabled={!canSubmitPetInfo || saving}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select niche" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NICHES.map((n) => (
+                    <SelectItem key={n} value={n}>
+                      {n.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Country *</Label>

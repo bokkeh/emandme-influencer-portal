@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db, users, influencerProfiles } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { syncInfluencerToHubSpot } from "@/lib/hubspot/sync";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 export async function PATCH(req: Request) {
   try {
@@ -35,6 +36,8 @@ export async function PATCH(req: Request) {
       typeof shippingCountry === "string" && shippingCountry.trim()
         ? shippingCountry.trim().toUpperCase().slice(0, 2)
         : "US";
+    const normalizedPhone =
+      typeof phone === "string" && phone.trim() ? normalizePhoneE164(phone) : null;
 
     const [updated] = await db
       .insert(influencerProfiles)
@@ -42,7 +45,7 @@ export async function PATCH(req: Request) {
         userId: user.id,
         displayName: displayName || null,
         bio: bio || null,
-        phone: phone || null,
+        phone: normalizedPhone,
         niche: niche || null,
         shippingAddressLine1: shippingAddressLine1 || null,
         shippingAddressLine2: shippingAddressLine2 || null,
@@ -57,7 +60,7 @@ export async function PATCH(req: Request) {
         set: {
           displayName: displayName || null,
           bio: bio || null,
-          phone: phone || null,
+          phone: normalizedPhone,
           niche: niche || null,
           shippingAddressLine1: shippingAddressLine1 || null,
           shippingAddressLine2: shippingAddressLine2 || null,
