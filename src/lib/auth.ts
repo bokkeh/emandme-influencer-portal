@@ -29,7 +29,7 @@ export async function requireAdmin() {
 export function isEmailSuperAdmin(email: string | null | undefined) {
   const normalized = (email ?? "").trim().toLowerCase();
   if (!normalized) return false;
-  const configured = (process.env.SUPERADMIN_EMAILS ?? "")
+  const configured = (process.env.SUPERADMIN_EMAILS ?? process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((v) => v.trim().toLowerCase())
     .filter(Boolean);
@@ -37,6 +37,12 @@ export function isEmailSuperAdmin(email: string | null | undefined) {
 }
 
 export async function isSuperAdminByUserId(userId: string) {
+  const configuredUserIds = (process.env.SUPERADMIN_USER_IDS ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  if (configuredUserIds.includes(userId)) return true;
+
   const [dbUser] = await db.select({ email: users.email }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
   return isEmailSuperAdmin(dbUser?.email);
 }
