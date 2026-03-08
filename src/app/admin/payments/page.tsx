@@ -132,12 +132,23 @@ export default async function PaymentsPage() {
                         {p.paidAt ? format(new Date(p.paidAt), "MMM d, yyyy") : "—"}
                       </TableCell>
                       <TableCell>
-                        {p.status === "pending" && p.stripePayoutsEnabled && (
-                          <TriggerPayoutButton paymentId={p.id} />
-                        )}
-                        {p.stripeTransferId && (
+                        {p.status === "pending" ? (
+                          p.stripePayoutsEnabled ? (
+                            <TriggerPayoutButton paymentId={p.id} />
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              title="Influencer must connect Stripe and enable payouts first."
+                              className="h-8 rounded-md border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500"
+                            >
+                              Pay Now (Connect Required)
+                            </button>
+                          )
+                        ) : null}
+                        {p.stripeTransferId ? (
                           <span className="font-mono text-xs text-gray-400">{p.stripeTransferId.slice(0, 16)}…</span>
-                        )}
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   );
