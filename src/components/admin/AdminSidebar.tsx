@@ -16,6 +16,7 @@ import {
   BarChart3,
   Settings,
   FileText,
+  Users,
 } from "lucide-react";
 import { ViewModeToggle } from "@/components/shared/ViewModeToggle";
 
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { label: "UTM Generator", href: "/admin/utm", icon: Link2 },
   { label: "Discount Codes", href: "/admin/discount-codes", icon: Tag },
   { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+  { label: "Team", href: "/admin/team", icon: Users },
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
