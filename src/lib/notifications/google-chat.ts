@@ -113,4 +113,13 @@ export const googleChat = {
 
   campaignSignupRequested: (campaignTitle: string, influencerName: string) =>
     sendText(`📝 Campaign signup request: ${influencerName} joined "${campaignTitle}" (pending approval).`),
+
+  campaignEnrollmentDecision: (
+    campaignTitle: string,
+    influencerName: string,
+    decision: "accepted" | "declined"
+  ) =>
+    sendText(
+      `${decision === "accepted" ? "✅" : "❌"} Campaign enrollment ${decision}: ${influencerName} in "${campaignTitle}".`
+    ),
 };

@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { db, campaignInfluencers, users } from "@/lib/db";
+import { db, campaignInfluencers, users, campaigns, influencerProfiles } from "@/lib/db";
+import { googleChat } from "@/lib/notifications/google-chat";
 
 async function requireAdminApi() {
   const { userId, sessionClaims } = await auth();
@@ -37,6 +38,20 @@ export async function PATCH(
       contractSignedAt?: string | null;
       notes?: string | null;
     };
+
+    const [existing] = await db
+      .select({
+        status: campaignInfluencers.status,
+        influencerName: influencerProfiles.displayName,
+        campaignTitle: campaigns.title,
+      })
+      .from(campaignInfluencers)
+      .innerJoin(influencerProfiles, eq(campaignInfluencers.influencerProfileId, influencerProfiles.id))
+      .innerJoin(campaigns, eq(campaignInfluencers.campaignId, campaigns.id))
+      .where(and(eq(campaignInfluencers.id, enrollmentId), eq(campaignInfluencers.campaignId, id)))
+      .limit(1);
+
+    if (!existing) return new NextResponse("Enrollment not found", { status: 404 });
 
     const [updated] = await db
       .update(campaignInfluencers)
@@ -81,6 +96,19 @@ export async function PATCH(
       .returning();
 
     if (!updated) return new NextResponse("Enrollment not found", { status: 404 });
+
+    const nextStatus = updated.status;
+    const priorStatus = existing.status;
+    if (
+      priorStatus !== nextStatus &&
+      (nextStatus === "accepted" || nextStatus === "declined")
+    ) {
+      const influencerName = (existing.influencerName ?? "").trim() || "Influencer";
+      googleChat
+        .campaignEnrollmentDecision(existing.campaignTitle, influencerName, nextStatus)
+        .catch(() => {});
+    }
+
     return NextResponse.json(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update enrollment";
