@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
+import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, X, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, X, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const PLATFORMS = ["instagram", "tiktok", "youtube", "pinterest", "blog"];
@@ -22,6 +23,7 @@ const CONTENT_TYPES: Record<string, string[]> = {
 };
 
 type UploadState = "idle" | "uploading" | "saving" | "done" | "error";
+const MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_FILE_MB ?? "4096");
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -47,7 +49,7 @@ export default function UploadPage() {
       "video/*": [".mp4", ".mov", ".webm"],
     },
     maxFiles: 1,
-    maxSize: 500 * 1024 * 1024,
+    maxSize: MAX_UPLOAD_MB * 1024 * 1024,
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,29 +60,37 @@ export default function UploadPage() {
     }
 
     setUploadState("uploading");
-    setProgress(20);
+    setProgress(15);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const contextRes = await fetch("/api/upload", { cache: "no-store" });
+      if (!contextRes.ok) throw new Error(await contextRes.text());
+      const context = (await contextRes.json()) as { influencerProfileId: string };
 
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const pathname = `assets/${context.influencerProfileId}/${Date.now()}-${safeName}`;
+
+      const blob = await upload(pathname, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+        onUploadProgress: (event) => {
+          const next = Math.min(60, Math.max(15, Math.round(event.percentage * 0.6)));
+          setProgress(next);
+        },
       });
 
-      if (!uploadRes.ok) throw new Error(await uploadRes.text());
-      const { url, fileType, fileSizeMb, influencerProfileId } = await uploadRes.json();
+      const fileType = file.type.startsWith("image/") ? "image" : "video";
+      const fileSizeMb = file.size / (1024 * 1024);
 
-      setProgress(60);
+      setProgress(70);
       setUploadState("saving");
 
       const saveRes = await fetch("/api/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          influencerProfileId,
-          blobUrl: url,
+          influencerProfileId: context.influencerProfileId,
+          blobUrl: blob.url,
           fileType,
           fileSizeMb,
           platform,
@@ -103,10 +113,13 @@ export default function UploadPage() {
       setTitle("");
       setCaption("");
       setPostUrl("");
-      setTimeout(() => { setUploadState("idle"); setProgress(0); }, 3000);
+      setTimeout(() => {
+        setUploadState("idle");
+        setProgress(0);
+      }, 3000);
     } catch (err) {
       setUploadState("error");
-      toast.error("Upload failed. Please try again.");
+      toast.error(err instanceof Error ? err.message : "Upload failed. Please try again.");
       console.error(err);
     }
   }
@@ -119,15 +132,14 @@ export default function UploadPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Dropzone */}
         <div
           {...getRootProps()}
           className={`cursor-pointer rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
             isDragActive
               ? "border-rose-400 bg-rose-50"
               : file
-              ? "border-green-400 bg-green-50"
-              : "border-gray-300 bg-white hover:border-rose-300 hover:bg-rose-50"
+                ? "border-green-400 bg-green-50"
+                : "border-gray-300 bg-white hover:border-rose-300 hover:bg-rose-50"
           }`}
         >
           <input {...getInputProps()} />
@@ -136,13 +148,14 @@ export default function UploadPage() {
               <CheckCircle className="h-8 w-8 text-green-600" />
               <div className="text-left">
                 <p className="font-medium text-gray-900">{file.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(file.size / (1024 * 1024)).toFixed(1)} MB
-                </p>
+                <p className="text-sm text-gray-500">{(file.size / (1024 * 1024)).toFixed(1)} MB</p>
               </div>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFile(null);
+                }}
                 className="ml-4 text-gray-400 hover:text-red-500"
               >
                 <X className="h-5 w-5" />
@@ -154,14 +167,11 @@ export default function UploadPage() {
               <p className="mt-3 text-sm font-medium text-gray-700">
                 {isDragActive ? "Drop your file here" : "Drag & drop or click to browse"}
               </p>
-              <p className="mt-1 text-xs text-gray-400">
-                JPG, PNG, WEBP, MP4, MOV · Max 500MB
-              </p>
+              <p className="mt-1 text-xs text-gray-400">JPG, PNG, WEBP, MP4, MOV · Max {MAX_UPLOAD_MB}MB</p>
             </div>
           )}
         </div>
 
-        {/* Metadata */}
         <Card className="border border-gray-200">
           <CardHeader>
             <CardTitle className="text-base">Content Details</CardTitle>
@@ -219,20 +229,19 @@ export default function UploadPage() {
                 placeholder="https://www.instagram.com/p/..."
                 type="url"
               />
-              <p className="mt-1 text-xs text-gray-400">Optional — add the link once it's posted</p>
+              <p className="mt-1 text-xs text-gray-400">Optional - add the link once it&apos;s posted</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Progress */}
         {uploadState !== "idle" && (
           <div className="space-y-2">
             <Progress value={progress} className="h-2" />
             <p className="text-xs text-gray-500">
               {uploadState === "uploading" && "Uploading file..."}
               {uploadState === "saving" && "Saving to database..."}
-              {uploadState === "done" && "✅ Upload complete!"}
-              {uploadState === "error" && "❌ Upload failed"}
+              {uploadState === "done" && "Upload complete!"}
+              {uploadState === "error" && "Upload failed"}
             </p>
           </div>
         )}
@@ -249,3 +258,4 @@ export default function UploadPage() {
     </div>
   );
 }
+

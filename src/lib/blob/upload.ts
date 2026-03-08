@@ -2,7 +2,10 @@ import { put } from "@vercel/blob";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
-const MAX_FILE_SIZE_MB = 500;
+const MAX_FILE_SIZE_MB = Number(process.env.MAX_UPLOAD_FILE_MB ?? "4096");
+
+export const ALLOWED_UPLOAD_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
+export const MAX_UPLOAD_FILE_MB = MAX_FILE_SIZE_MB;
 
 export function validateFile(file: File): { valid: boolean; error?: string } {
   const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
