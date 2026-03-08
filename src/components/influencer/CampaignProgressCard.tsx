@@ -10,13 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type ChecklistItem = {
   label: string;
@@ -85,11 +78,17 @@ export function CampaignProgressCard({
   const [petBreed, setPetBreed] = useState(initialPetInfo.petBreed);
   const [petAge, setPetAge] = useState(initialPetInfo.petAge);
   const [petPersonality, setPetPersonality] = useState(initialPetInfo.petPersonality);
-  const [tagPersonalizationText, setTagPersonalizationText] = useState(initialPetInfo.tagPersonalizationText);
 
   const defaultSelectedProductId =
     initialPetInfo.selectedProductId || campaignProducts[0]?.shopifyProductId || campaignProducts[0]?.title || "";
   const [selectedProductId, setSelectedProductId] = useState(defaultSelectedProductId);
+  const [personalizationByProduct, setPersonalizationByProduct] = useState<Record<string, string>>(
+    defaultSelectedProductId
+      ? {
+          [defaultSelectedProductId]: initialPetInfo.tagPersonalizationText,
+        }
+      : {}
+  );
 
   const completed = checklist.filter((item) => item.done).length;
   const percent = Math.round((completed / checklist.length) * 100);
@@ -99,6 +98,7 @@ export function CampaignProgressCard({
       campaignProducts.find((p) => (p.shopifyProductId || p.title) === selectedProductId) || null
     );
   }, [campaignProducts, selectedProductId]);
+  const selectedPersonalization = selectedProductId ? (personalizationByProduct[selectedProductId] ?? "") : "";
 
   async function submitCampaignOnboarding() {
     if (!canSubmitPetInfo) {
@@ -122,7 +122,7 @@ export function CampaignProgressCard({
       !petBreed.trim() ||
       !petAge.trim() ||
       !petPersonality.trim() ||
-      !tagPersonalizationText.trim() ||
+      !selectedPersonalization.trim() ||
       !selectedProduct
     ) {
       toast.error("Please complete all required onboarding fields.");
@@ -148,7 +148,7 @@ export function CampaignProgressCard({
           petBreed,
           petAge,
           petPersonality,
-          tagPersonalizationText,
+          tagPersonalizationText: selectedPersonalization,
           selectedProductId: selectedProduct.shopifyProductId ?? null,
           selectedProductTitle: selectedProduct.title,
           selectedProductVariantId: selectedProduct.variantId ?? null,
@@ -259,35 +259,63 @@ export function CampaignProgressCard({
           </div>
 
           <div className="space-y-3">
-            <div>
-              <Label>Select campaign tag/product *</Label>
-              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                <SelectTrigger className="w-full" disabled={!canSubmitPetInfo || saving}>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaignProducts.map((product, index) => {
-                    const value = product.shopifyProductId || product.title || `product-${index}`;
-                    return (
-                      <SelectItem key={value} value={value}>
-                        {product.title}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Tag personalization fields *</Label>
-              <Textarea
-                rows={3}
-                value={tagPersonalizationText}
-                onChange={(e) => setTagPersonalizationText(e.target.value)}
-                disabled={!canSubmitPetInfo || saving}
-                placeholder="Ex: Front: BASIL | Back: Alex 555-555-5555"
-              />
-            </div>
+            <Label>Select campaign tag/product *</Label>
+            {campaignProducts.length === 0 ? (
+              <p className="text-xs text-gray-500">No products have been added to this campaign yet.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {campaignProducts.map((product, index) => {
+                  const value = product.shopifyProductId || product.title || `product-${index}`;
+                  const isSelected = selectedProductId === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSelectedProductId(value)}
+                      disabled={!canSubmitPetInfo || saving}
+                      className={`rounded-lg border bg-white text-left transition ${
+                        isSelected
+                          ? "border-rose-500 ring-2 ring-rose-200"
+                          : "border-gray-200 hover:border-rose-300"
+                      }`}
+                    >
+                      <div className="aspect-square w-full overflow-hidden rounded-t-lg bg-gray-100">
+                        {product.imageUrl ? (
+                          <img
+                            src={product.imageUrl}
+                            alt={product.title}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                            No image
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2 p-3">
+                        <p className="text-sm font-semibold text-gray-900">{product.title}</p>
+                        <div>
+                          <Label className="text-xs">Tag personalization *</Label>
+                          <Textarea
+                            rows={2}
+                            value={personalizationByProduct[value] ?? ""}
+                            onChange={(e) =>
+                              setPersonalizationByProduct((prev) => ({
+                                ...prev,
+                                [value]: e.target.value,
+                              }))
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={!canSubmitPetInfo || saving}
+                            placeholder="Ex: Front: BASIL | Back: Alex 555-555-5555"
+                          />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end">
@@ -297,7 +325,7 @@ export function CampaignProgressCard({
               disabled={!canSubmitPetInfo || saving}
               className="bg-rose-600 hover:bg-rose-700"
             >
-              {saving ? "Submitting..." : "Confirm Selection and Submit Order"}
+              {saving ? "Submitting..." : "Submit Order"}
             </Button>
           </div>
         </div>
