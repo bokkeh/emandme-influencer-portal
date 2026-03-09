@@ -77,3 +77,63 @@ export async function syncInfluencerToHubSpot({ influencerProfileId }: SyncParam
     syncedAt: new Date().toISOString(),
   };
 }
+
+type AssetReviewEmailParams = {
+  influencerProfileId: string;
+  status: "approved" | "rejected" | "revision_requested";
+  campaignTitle?: string | null;
+  assetTitle?: string | null;
+  reviewNotes?: string | null;
+};
+
+export async function sendAssetReviewEmailViaHubSpot({
+  influencerProfileId,
+  status,
+  campaignTitle,
+  assetTitle,
+  reviewNotes,
+}: AssetReviewEmailParams) {
+  const [profile] = await db
+    .select({
+      id: influencerProfiles.id,
+      userEmail: users.email,
+      userFirstName: users.firstName,
+      userLastName: users.lastName,
+    })
+    .from(influencerProfiles)
+    .innerJoin(users, eq(influencerProfiles.userId, users.id))
+    .where(eq(influencerProfiles.id, influencerProfileId))
+    .limit(1);
+
+  if (!profile?.userEmail) return;
+
+  const emailIdRaw =
+    status === "approved"
+      ? process.env.HUBSPOT_ASSET_APPROVED_EMAIL_ID
+      : process.env.HUBSPOT_ASSET_REJECTED_EMAIL_ID;
+  const emailId = Number(emailIdRaw);
+  if (!Number.isFinite(emailId)) {
+    // Keep this non-fatal so asset review actions still succeed.
+    console.warn(`[HubSpot] Missing email template id for asset review status "${status}"`);
+    return;
+  }
+
+  const fullName = `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim();
+  await hubspot.sendSingleEmail({
+    to: profile.userEmail,
+    emailId,
+    contactProperties: {
+      firstname: profile.userFirstName ?? "",
+      lastname: profile.userLastName ?? "",
+      email: profile.userEmail,
+    },
+    customProperties: {
+      influencer_name: fullName || profile.userEmail,
+      asset_status: status,
+      campaign_title: campaignTitle ?? "",
+      asset_title: assetTitle ?? "",
+      review_notes: reviewNotes ?? "",
+      asset_feedback: reviewNotes ?? "",
+    },
+  });
+}

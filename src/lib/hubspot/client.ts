@@ -42,4 +42,22 @@ export const hubspot = {
       method: "PATCH",
       body: JSON.stringify({ properties }),
     }),
+
+  sendSingleEmail: (params: {
+    to: string;
+    emailId: number;
+    contactProperties?: Record<string, string>;
+    customProperties?: Record<string, string>;
+  }) =>
+    hubspotFetch("/marketing/v3/transactional/single-email/send", {
+      method: "POST",
+      body: JSON.stringify({
+        emailId: params.emailId,
+        message: {
+          to: params.to,
+        },
+        contactProperties: params.contactProperties ?? {},
+        customProperties: params.customProperties ?? {},
+      }),
+    }),
 };

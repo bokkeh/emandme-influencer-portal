@@ -5,10 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformBadge } from "@/components/shared/PlatformBadge";
 import { CopyButton } from "@/components/shared/CopyButton";
-import { ImageIcon } from "lucide-react";
+import { ExternalLink, ImageIcon } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { AssetReviewActions } from "@/components/admin/AssetReviewActions";
 
 export default async function AssetsPage() {
   const allAssets = await db
@@ -21,6 +23,7 @@ export default async function AssetsPage() {
       platform: assets.platform,
       title: assets.title,
       status: assets.status,
+      reviewNotes: assets.reviewNotes,
       createdAt: assets.createdAt,
       influencerId: influencerProfiles.id,
       influencerName: influencerProfiles.displayName,
@@ -85,23 +88,45 @@ export default async function AssetsPage() {
                     href={`/admin/influencers/${asset.influencerId}`}
                     className="block truncate text-xs text-gray-400 hover:text-rose-600"
                   >
-                    {name}
+                    Submitted by {name}
                   </Link>
                   {asset.platform && <PlatformBadge platform={asset.platform} />}
                   <p className="mt-1 text-xs text-gray-400">
                     {formatDistanceToNow(new Date(asset.createdAt), { addSuffix: true })}
                   </p>
+                  {asset.status !== "pending_review" ? (
+                    <p className="mt-1 rounded bg-gray-50 px-2 py-1 text-[11px] text-gray-600">
+                      {asset.status === "approved" ? "Approved to go live" : asset.status.replace("_", " ")}
+                    </p>
+                  ) : null}
                   <div className="mt-2 flex items-center gap-2">
-                    <a
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <a
                       href={asset.blobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-rose-600 underline"
                     >
+                      <ExternalLink className="h-3.5 w-3.5" />
                       Open
-                    </a>
+                      </a>
+                    </Button>
                     <CopyButton text={asset.blobUrl} label="Copy link" />
                   </div>
+                  <AssetReviewActions
+                    assetId={asset.id}
+                    currentStatus={asset.status}
+                    initialReviewNotes={asset.reviewNotes}
+                  />
+                  {asset.reviewNotes ? (
+                    <p className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-700">
+                      Review notes: {asset.reviewNotes}
+                    </p>
+                  ) : null}
                 </CardContent>
               </Card>
             );

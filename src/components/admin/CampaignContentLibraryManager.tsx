@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Download, Plus, Trash2 } from "lucide-react";
+import { Download, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -214,9 +214,12 @@ export function CampaignContentLibraryManager({
                     <a href={item.url} download className="text-xs text-rose-600 underline">
                       Download
                     </a>
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-600 underline">
-                      Open
-                    </a>
+                    <Button type="button" size="sm" variant="outline" className="gap-1" asChild>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Open
+                      </a>
+                    </Button>
                     <CopyButton text={item.url} label="Copy link" />
                     <Button
                       type="button"

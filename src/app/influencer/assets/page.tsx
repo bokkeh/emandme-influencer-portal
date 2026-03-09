@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ImageIcon, Upload } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { AssetDeleteButton } from "@/components/influencer/AssetDeleteButton";
 
 export default async function InfluencerAssetsPage() {
   const { userId } = await auth();
@@ -27,6 +28,12 @@ export default async function InfluencerAssetsPage() {
     .from(assets)
     .where(eq(assets.influencerProfileId, profile.id))
     .orderBy(assets.createdAt);
+
+  const recentReviewedAssets = myAssets.filter((asset) => {
+    if (!asset.reviewedAt) return false;
+    const reviewedAt = new Date(asset.reviewedAt);
+    return Date.now() - reviewedAt.getTime() <= 1000 * 60 * 60 * 24 * 14;
+  });
 
   return (
     <div className="space-y-6">
@@ -55,8 +62,15 @@ export default async function InfluencerAssetsPage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {myAssets.map((asset) => {
+        <>
+          {recentReviewedAssets.length > 0 ? (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+              {recentReviewedAssets.length} asset review update{recentReviewedAssets.length > 1 ? "s" : ""} in the
+              last 14 days.
+            </div>
+          ) : null}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {myAssets.map((asset) => {
             const metrics = (asset.metrics as Record<string, number>) ?? {};
             return (
               <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm">
@@ -92,14 +106,23 @@ export default async function InfluencerAssetsPage() {
                       {metrics.likes ? <span>Likes {metrics.likes.toLocaleString()}</span> : null}
                     </div>
                   )}
-                  {asset.reviewNotes && asset.status === "rejected" && (
-                    <p className="mt-1 rounded bg-red-50 p-1.5 text-xs text-red-500">{asset.reviewNotes}</p>
+                  {asset.status === "approved" ? (
+                    <p className="mt-1 rounded bg-green-50 p-1.5 text-xs text-green-700">
+                      Approved to go live.
+                    </p>
+                  ) : null}
+                  {asset.reviewNotes && (asset.status === "rejected" || asset.status === "revision_requested") && (
+                    <p className="mt-1 rounded bg-red-50 p-1.5 text-xs text-red-500">Review notes: {asset.reviewNotes}</p>
                   )}
+                  <div className="pt-1">
+                    <AssetDeleteButton assetId={asset.id} />
+                  </div>
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
+            })}
+          </div>
+        </>
       )}
     </div>
   );
