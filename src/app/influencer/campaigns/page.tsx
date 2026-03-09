@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users, influencerProfiles, campaignInfluencers, campaigns } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,7 +49,12 @@ export default async function InfluencerCampaignsPage() {
     })
     .from(campaignInfluencers)
     .innerJoin(campaigns, eq(campaignInfluencers.campaignId, campaigns.id))
-    .where(eq(campaignInfluencers.influencerProfileId, profile.id))
+    .where(
+      and(
+        eq(campaignInfluencers.influencerProfileId, profile.id),
+        ne(campaignInfluencers.status, "removed")
+      )
+    )
     .orderBy(campaigns.startDate);
 
   return (

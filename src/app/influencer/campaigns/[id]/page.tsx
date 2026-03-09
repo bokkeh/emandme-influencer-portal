@@ -106,6 +106,7 @@ export default async function InfluencerCampaignDetailPage({
     .limit(1);
 
   if (!enrollment) notFound();
+  if (enrollment.status === "removed") notFound();
   if (enrollment.status === "invited") redirect("/influencer/campaigns");
 
   const [myUTMLink, myDiscountCode] = await Promise.all([
@@ -172,7 +173,7 @@ export default async function InfluencerCampaignDetailPage({
   const joinedCampaign = ["accepted", "active", "completed"].includes(enrollment.status);
   const checklist = [
     { label: "Joined campaign", done: joinedCampaign },
-    { label: "Complete your profile", done: profileComplete },
+    { label: "Complete your profile", done: profileComplete, href: "/influencer/profile" },
     { label: "Submitted pet tag info", done: petInfoSubmitted },
     { label: "Product shipped", done: Boolean(shipment[0]) },
     { label: "Content submitted for approval", done: Boolean(submittedAsset[0]), href: `/influencer/upload?campaignId=${id}` },
