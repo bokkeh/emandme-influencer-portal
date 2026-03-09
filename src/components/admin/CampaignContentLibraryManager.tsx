@@ -145,15 +145,17 @@ export function CampaignContentLibraryManager({
               {campaignAssets.map((asset) => (
                 <div key={asset.id} className="rounded-md border border-gray-200 p-2">
                   {asset.fileType === "video" ? (
-                    <video
-                      className="h-28 w-full rounded bg-black object-cover"
-                      controls
-                      preload="metadata"
-                      playsInline
-                      poster={asset.thumbnailUrl ?? undefined}
-                    >
-                      <source src={asset.blobUrl} />
-                    </video>
+                    <div className="flex items-center justify-center rounded bg-black p-1">
+                      <video
+                        className="h-auto w-full rounded"
+                        controls
+                        preload="metadata"
+                        playsInline
+                        poster={asset.thumbnailUrl ?? undefined}
+                      >
+                        <source src={asset.blobUrl} />
+                      </video>
+                    </div>
                   ) : asset.thumbnailUrl ? (
                     <img src={asset.thumbnailUrl} alt={asset.title ?? "Asset"} className="h-28 w-full rounded object-cover" />
                   ) : (
@@ -199,9 +201,11 @@ export function CampaignContentLibraryManager({
               {media.map((item, index) => (
                 <div key={`${item.url}-${index}`} className="rounded border border-gray-200 bg-gray-50 p-2 text-sm">
                   {item.fileType === "video" ? (
-                    <video className="h-28 w-full rounded bg-black object-cover" controls preload="metadata" playsInline>
-                      <source src={item.url} />
-                    </video>
+                    <div className="flex items-center justify-center rounded bg-black p-1">
+                      <video className="h-auto w-full rounded" controls preload="metadata" playsInline>
+                        <source src={item.url} />
+                      </video>
+                    </div>
                   ) : (
                     <img src={item.url} alt={item.name ?? "Uploaded media"} className="h-28 w-full rounded object-cover" />
                   )}

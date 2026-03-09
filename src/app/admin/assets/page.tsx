@@ -55,10 +55,10 @@ export default async function AssetsPage() {
               asset.userEmail;
             return (
               <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm transition-shadow hover:shadow-md">
-                <div className="relative flex h-40 items-center justify-center bg-gray-100">
+                <div className={`relative flex items-center justify-center bg-gray-100 ${asset.fileType === "video" ? "p-1" : "h-40"}`}>
                   {asset.fileType === "video" ? (
                     <video
-                      className="h-full w-full bg-black object-cover"
+                      className="h-auto w-full rounded bg-black"
                       controls
                       preload="metadata"
                       playsInline
