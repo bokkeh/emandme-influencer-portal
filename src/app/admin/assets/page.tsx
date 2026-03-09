@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformBadge } from "@/components/shared/PlatformBadge";
+import { CopyButton } from "@/components/shared/CopyButton";
 import { ImageIcon } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatDistanceToNow } from "date-fns";
@@ -90,6 +91,17 @@ export default async function AssetsPage() {
                   <p className="mt-1 text-xs text-gray-400">
                     {formatDistanceToNow(new Date(asset.createdAt), { addSuffix: true })}
                   </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <a
+                      href={asset.blobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-rose-600 underline"
+                    >
+                      Open
+                    </a>
+                    <CopyButton text={asset.blobUrl} label="Copy link" />
+                  </div>
                 </CardContent>
               </Card>
             );

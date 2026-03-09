@@ -163,9 +163,12 @@ export function CampaignContentLibraryManager({
                   )}
                   <div className="mt-2 flex items-center justify-between">
                     <StatusBadge status={asset.status} />
-                    <a href={asset.blobUrl} download className="text-xs text-rose-600 underline">
-                      Download
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <a href={asset.blobUrl} download className="text-xs text-rose-600 underline">
+                        Download
+                      </a>
+                      <CopyButton text={asset.blobUrl} label="Copy link" />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -210,6 +213,7 @@ export function CampaignContentLibraryManager({
                     <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-600 underline">
                       Open
                     </a>
+                    <CopyButton text={item.url} label="Copy link" />
                     <Button
                       type="button"
                       size="icon-xs"
