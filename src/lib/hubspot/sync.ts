@@ -107,33 +107,55 @@ export async function sendAssetReviewEmailViaHubSpot({
 
   if (!profile?.userEmail) return { sent: false as const, reason: "MISSING_EMAIL" as const };
 
-  const emailIdRaw =
-    status === "approved"
-      ? process.env.HUBSPOT_ASSET_APPROVED_EMAIL_ID
-      : process.env.HUBSPOT_ASSET_REJECTED_EMAIL_ID;
-  const emailId = Number(emailIdRaw);
-  if (!Number.isFinite(emailId)) {
-    return { sent: false as const, reason: "MISSING_TEMPLATE_ID" as const };
-  }
+  const statusProp = process.env.HUBSPOT_ASSET_REVIEW_STATUS_PROPERTY?.trim() || "asset_review_status";
+  const feedbackProp = process.env.HUBSPOT_ASSET_FEEDBACK_PROPERTY?.trim() || "asset_feedback";
+  const titleProp = process.env.HUBSPOT_ASSET_TITLE_PROPERTY?.trim() || "asset_title";
+  const campaignProp = process.env.HUBSPOT_CAMPAIGN_TITLE_PROPERTY?.trim() || "campaign_title";
+  const reviewedAtProp = process.env.HUBSPOT_ASSET_REVIEWED_AT_PROPERTY?.trim() || "asset_reviewed_at";
 
   const fullName = `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim();
-  await hubspot.sendSingleEmail({
-    to: profile.userEmail,
-    emailId,
-    contactProperties: {
-      firstname: profile.userFirstName ?? "",
-      lastname: profile.userLastName ?? "",
-      email: profile.userEmail,
-    },
-    customProperties: {
-      influencer_name: fullName || profile.userEmail,
-      asset_status: status,
-      campaign_title: campaignTitle ?? "",
-      asset_title: assetTitle ?? "",
-      review_notes: reviewNotes ?? "",
-      asset_feedback: reviewNotes ?? "",
-    },
-  });
+  const properties: Record<string, string> = {
+    email: profile.userEmail,
+    firstname: profile.userFirstName ?? "",
+    lastname: profile.userLastName ?? "",
+    influencer_name: fullName || profile.userEmail,
+    [statusProp]: status,
+    [feedbackProp]: reviewNotes ?? "",
+    [titleProp]: assetTitle ?? "",
+    [campaignProp]: campaignTitle ?? "",
+    [reviewedAtProp]: new Date().toISOString(),
+  };
 
+  let contactId = "";
+  const [existingProfile] = await db
+    .select({ hubspotContactId: influencerProfiles.hubspotContactId })
+    .from(influencerProfiles)
+    .where(eq(influencerProfiles.id, influencerProfileId))
+    .limit(1);
+  if (existingProfile?.hubspotContactId) {
+    contactId = existingProfile.hubspotContactId;
+  } else {
+    const search = await hubspot.getContactByEmail(profile.userEmail);
+    if (search.total > 0) {
+      contactId = String(search.results[0].id);
+    }
+  }
+
+  if (contactId) {
+    await hubspot.updateContact(contactId, properties);
+  } else {
+    const created = await hubspot.createContact(properties);
+    contactId = String(created.id);
+  }
+
+  await db
+    .update(influencerProfiles)
+    .set({
+      hubspotContactId: contactId || null,
+      hubspotLastSyncedAt: new Date(),
+    })
+    .where(eq(influencerProfiles.id, influencerProfileId));
+
+  // "sent" here means workflow trigger payload was successfully pushed to HubSpot.
   return { sent: true as const };
 }

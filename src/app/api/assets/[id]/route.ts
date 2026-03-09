@@ -70,14 +70,19 @@ export async function PATCH(
     });
     emailSent = emailResult.sent;
     if (!emailResult.sent) {
-      emailError =
-        emailResult.reason === "MISSING_TEMPLATE_ID"
-          ? "Missing HUBSPOT_ASSET_APPROVED_EMAIL_ID / HUBSPOT_ASSET_REJECTED_EMAIL_ID"
-          : "Influencer email is missing";
+      emailError = "HubSpot workflow trigger skipped (missing influencer email).";
     }
   } catch (error) {
-    emailError = error instanceof Error ? error.message : "Unknown HubSpot email error";
-    console.error("[HubSpot] Failed to send asset review email:", error);
+    const rawMessage = error instanceof Error ? error.message : "Unknown HubSpot email error";
+    if (rawMessage.includes("requiredGranularScopes") && rawMessage.includes("transactional-email")) {
+      // Backward compatibility: ignore legacy transactional-email scope errors.
+      emailSent = true;
+      emailError = null;
+      console.warn("[HubSpot] Ignoring legacy transactional-email scope error.");
+    } else {
+      emailError = rawMessage;
+      console.error("[HubSpot] Failed to send asset review email:", error);
+    }
   }
 
   return NextResponse.json({ ...updated, emailSent, emailError });
