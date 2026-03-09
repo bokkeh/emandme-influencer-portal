@@ -18,6 +18,31 @@ export default function InfluencerProfilePage() {
   const [loading, setLoading] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [profile, setProfile] = useState<Record<string, string>>({});
+  const [formVersion, setFormVersion] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    async function loadProfile() {
+      try {
+        const res = await fetch("/api/profile");
+        if (!res.ok) return;
+        const data = (await res.json()) as Record<string, string | null>;
+        if (!active) return;
+        setProfile(
+          Object.fromEntries(
+            Object.entries(data).map(([key, value]) => [key, value ?? ""])
+          ) as Record<string, string>
+        );
+        setFormVersion((v) => v + 1);
+      } catch {
+        // no-op
+      }
+    }
+    loadProfile();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleStripeConnect() {
     setStripeLoading(true);
@@ -82,29 +107,52 @@ export default function InfluencerProfilePage() {
       </Card>
 
       {/* Profile Form */}
-      <form onSubmit={handleSave}>
+      <form onSubmit={handleSave} key={formVersion}>
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Personal Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <Label>Email</Label>
+              <Input
+                name="email"
+                type="email"
+                defaultValue={profile.email || user?.primaryEmailAddress?.emailAddress || ""}
+                placeholder="you@example.com"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Display Name</Label>
-                <Input name="displayName" defaultValue={user?.fullName ?? ""} placeholder="Your name or brand name" />
+                <Input
+                  name="displayName"
+                  defaultValue={profile.displayName || user?.fullName || ""}
+                  placeholder="Your name or brand name"
+                />
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input name="phone" type="tel" placeholder="+1 (555) 000-0000" />
+                <Input
+                  name="phone"
+                  type="tel"
+                  defaultValue={profile.phone || ""}
+                  placeholder="+1 (555) 000-0000"
+                />
               </div>
             </div>
             <div>
               <Label>Bio</Label>
-              <Textarea name="bio" placeholder="Tell us about yourself and your content..." rows={3} />
+              <Textarea
+                name="bio"
+                defaultValue={profile.bio || ""}
+                placeholder="Tell us about yourself and your content..."
+                rows={3}
+              />
             </div>
             <div>
               <Label>Niche / Category</Label>
-              <Select name="niche">
+              <Select name="niche" defaultValue={profile.niche || undefined}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select your niche" />
                 </SelectTrigger>
@@ -125,30 +173,46 @@ export default function InfluencerProfilePage() {
           <CardContent className="space-y-4">
             <div>
               <Label>Street Address</Label>
-              <Input name="shippingAddressLine1" placeholder="123 Main St" />
+              <Input
+                name="shippingAddressLine1"
+                defaultValue={profile.shippingAddressLine1 || ""}
+                placeholder="123 Main St"
+              />
             </div>
             <div>
               <Label>Apt / Suite</Label>
-              <Input name="shippingAddressLine2" placeholder="Apt 4B (optional)" />
+              <Input
+                name="shippingAddressLine2"
+                defaultValue={profile.shippingAddressLine2 || ""}
+                placeholder="Apt 4B (optional)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>City</Label>
-                <Input name="shippingCity" placeholder="Los Angeles" />
+                <Input name="shippingCity" defaultValue={profile.shippingCity || ""} placeholder="Los Angeles" />
               </div>
               <div>
                 <Label>State</Label>
-                <Input name="shippingState" placeholder="CA" />
+                <Input name="shippingState" defaultValue={profile.shippingState || ""} placeholder="CA" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>ZIP Code</Label>
-                <Input name="shippingPostalCode" placeholder="90001" />
+                <Input
+                  name="shippingPostalCode"
+                  defaultValue={profile.shippingPostalCode || ""}
+                  placeholder="90001"
+                />
               </div>
               <div>
                 <Label>Country</Label>
-                <Input name="shippingCountry" defaultValue="US" placeholder="US" />
+                <Input
+                  name="shippingCountry"
+                  defaultValue={profile.shippingCountry || "US"}
+                  placeholder="US"
+                />
               </div>
             </div>
           </CardContent>

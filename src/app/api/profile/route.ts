@@ -5,6 +5,39 @@ import { eq } from "drizzle-orm";
 import { syncInfluencerToHubSpot } from "@/lib/hubspot/sync";
 import { normalizePhoneE164 } from "@/lib/phone";
 
+export async function GET() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+
+    const [row] = await db
+      .select({
+        userId: users.id,
+        email: users.email,
+        displayName: influencerProfiles.displayName,
+        bio: influencerProfiles.bio,
+        phone: influencerProfiles.phone,
+        niche: influencerProfiles.niche,
+        shippingAddressLine1: influencerProfiles.shippingAddressLine1,
+        shippingAddressLine2: influencerProfiles.shippingAddressLine2,
+        shippingCity: influencerProfiles.shippingCity,
+        shippingState: influencerProfiles.shippingState,
+        shippingPostalCode: influencerProfiles.shippingPostalCode,
+        shippingCountry: influencerProfiles.shippingCountry,
+      })
+      .from(users)
+      .leftJoin(influencerProfiles, eq(influencerProfiles.userId, users.id))
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+
+    if (!row) return new NextResponse("User not found", { status: 404 });
+    return NextResponse.json(row);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to load profile";
+    return new NextResponse(message, { status: 500 });
+  }
+}
+
 export async function PATCH(req: Request) {
   try {
     const { userId } = await auth();
@@ -12,6 +45,7 @@ export async function PATCH(req: Request) {
 
     const body = await req.json();
     const {
+      email,
       displayName,
       bio,
       phone,
@@ -31,6 +65,13 @@ export async function PATCH(req: Request) {
       .limit(1);
 
     if (!user) return new NextResponse("User not found", { status: 404 });
+
+    if (typeof email === "string" && email.trim()) {
+      await db
+        .update(users)
+        .set({ email: email.trim().toLowerCase() })
+        .where(eq(users.id, user.id));
+    }
 
     const normalizedCountry =
       typeof shippingCountry === "string" && shippingCountry.trim()

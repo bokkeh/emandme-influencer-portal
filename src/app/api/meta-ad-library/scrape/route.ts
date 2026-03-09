@@ -27,6 +27,24 @@ type SearchSpec = {
   inputType: "keyword" | "ad_library_url" | "creator_marketplace_url";
 };
 
+class MetaGraphError extends Error {
+  status: number;
+  graphCode?: number;
+  graphSubcode?: number;
+
+  constructor(
+    message: string,
+    status: number,
+    opts?: { graphCode?: number; graphSubcode?: number }
+  ) {
+    super(message);
+    this.name = "MetaGraphError";
+    this.status = status;
+    this.graphCode = opts?.graphCode;
+    this.graphSubcode = opts?.graphSubcode;
+  }
+}
+
 function decode(value: string) {
   return value
     .replace(/\\"/g, '"')
@@ -128,15 +146,25 @@ async function scrapeAdsFromGraph(params: {
   });
 
   const raw = await res.text();
-  if (!res.ok) {
-    throw new Error(`Graph API request failed (${res.status}): ${raw.slice(0, 220)}`);
+  let parsed: { data?: GraphAd[]; error?: { message?: string; code?: number; error_subcode?: number } };
+  try {
+    parsed = JSON.parse(raw) as {
+      data?: GraphAd[];
+      error?: { message?: string; code?: number; error_subcode?: number };
+    };
+  } catch {
+    if (!res.ok) {
+      throw new MetaGraphError(`Graph API request failed (${res.status}): ${raw.slice(0, 220)}`, res.status);
+    }
+    throw new Error("Graph API returned non-JSON response.");
   }
 
-  let parsed: { data?: GraphAd[] };
-  try {
-    parsed = JSON.parse(raw) as { data?: GraphAd[] };
-  } catch {
-    throw new Error("Graph API returned non-JSON response.");
+  if (!res.ok) {
+    const graphMessage = parsed.error?.message || `Graph API request failed (${res.status})`;
+    throw new MetaGraphError(graphMessage, res.status, {
+      graphCode: parsed.error?.code,
+      graphSubcode: parsed.error?.error_subcode,
+    });
   }
 
   const rows = parsed.data ?? [];
@@ -232,6 +260,26 @@ export async function POST(req: Request) {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Graph API unavailable";
+
+      if (
+        error instanceof MetaGraphError &&
+        error.graphCode === 190 &&
+        error.graphSubcode === 463
+      ) {
+        return NextResponse.json({
+          ads: [],
+          searchUrl,
+          keyword: parsed.keyword,
+          pageId: parsed.pageId,
+          country,
+          inputType: parsed.inputType,
+          source: "graph_api",
+          note:
+            `Meta access token expired. ${message} ` +
+            "Generate a new token in Meta Graph API Explorer/Marketing API tools, update META_ACCESS_TOKEN in Vercel + local env, then redeploy.",
+        });
+      }
+
       // Continue to HTML fallback.
       try {
         const response = await fetch(searchUrl, {
