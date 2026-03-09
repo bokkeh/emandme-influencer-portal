@@ -1,5 +1,6 @@
 import { put } from "@vercel/blob";
 import { Storage } from "@google-cloud/storage";
+import { createPrivateKey } from "node:crypto";
 
 type UploadInput = File | Buffer | Uint8Array | ArrayBuffer;
 
@@ -14,8 +15,34 @@ function getGcsConfig() {
   const bucket = process.env.GCS_BUCKET?.trim();
   const clientEmail = process.env.GCS_CLIENT_EMAIL?.trim();
   const privateKeyRaw = process.env.GCS_PRIVATE_KEY;
-  if (!projectId || !bucket || !clientEmail || !privateKeyRaw) return null;
-  const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
+  const privateKeyBase64 = process.env.GCS_PRIVATE_KEY_BASE64?.trim();
+  if (!projectId || !bucket || !clientEmail || (!privateKeyRaw && !privateKeyBase64)) return null;
+  let privateKey = "";
+
+  // Prefer base64 key when available to avoid env newline/escaping issues.
+  if (privateKeyBase64) {
+    try {
+      privateKey = Buffer.from(privateKeyBase64, "base64").toString("utf8").trim();
+    } catch {
+      privateKey = "";
+    }
+  }
+
+  if (!privateKey && privateKeyRaw) {
+    privateKey = privateKeyRaw.trim();
+  }
+
+  // Common Vercel formats:
+  // 1) literal \n escaped newlines
+  // 2) wrapped in single/double quotes
+  // 3) pasted with CRLF newlines
+  if (
+    (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+    (privateKey.startsWith("'") && privateKey.endsWith("'"))
+  ) {
+    privateKey = privateKey.slice(1, -1);
+  }
+  privateKey = privateKey.replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
   return { projectId, bucket, clientEmail, privateKey };
 }
 
@@ -32,6 +59,14 @@ function getPublicObjectUrl(bucket: string, objectPath: string) {
 }
 
 function createStorageClient(config: NonNullable<ReturnType<typeof getGcsConfig>>) {
+  try {
+    createPrivateKey(config.privateKey);
+  } catch {
+    throw new Error(
+      "Invalid GCS private key format. Set GCS_PRIVATE_KEY_BASE64 (base64 of private_key from service-account JSON), remove GCS_PRIVATE_KEY, and redeploy."
+    );
+  }
+
   return new Storage({
     projectId: config.projectId,
     credentials: {
