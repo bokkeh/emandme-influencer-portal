@@ -21,9 +21,10 @@ type Candidate = {
 
 type Props = {
   campaignId: string;
+  campaignType?: "influencer" | "ugc" | "affiliate";
 };
 
-export function CampaignEnrollmentManager({ campaignId }: Props) {
+export function CampaignEnrollmentManager({ campaignId, campaignType = "influencer" }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -32,6 +33,9 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
   const [agreedFee, setAgreedFee] = useState("");
   const [contentDueDate, setContentDueDate] = useState("");
   const [notes, setNotes] = useState("");
+
+  const singleLabel = campaignType === "influencer" ? "influencer" : "creator";
+  const titleLabel = campaignType === "influencer" ? "Influencer" : "Creator";
 
   const availableCandidates = useMemo(
     () => candidates.filter((candidate) => !candidate.enrolled),
@@ -42,11 +46,11 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
     setLoading(true);
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/enrollments`);
-      if (!res.ok) throw new Error((await res.text()) || "Failed to load influencers");
+      if (!res.ok) throw new Error((await res.text()) || `Failed to load ${singleLabel}s`);
       const data = (await res.json()) as Candidate[];
       setCandidates(data);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load influencers";
+      const message = error instanceof Error ? error.message : `Failed to load ${singleLabel}s`;
       toast.error(message);
     } finally {
       setLoading(false);
@@ -66,7 +70,7 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
 
   async function enroll() {
     if (!candidateId) {
-      toast.error("Select an influencer to enroll");
+      toast.error(`Select a ${singleLabel} to enroll`);
       return;
     }
     setSubmitting(true);
@@ -81,13 +85,13 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
           notes: notes || null,
         }),
       });
-      if (!res.ok) throw new Error((await res.text()) || "Failed to enroll influencer");
+      if (!res.ok) throw new Error((await res.text()) || `Failed to enroll ${singleLabel}`);
 
-      toast.success("Influencer enrolled");
+      toast.success(`${titleLabel} enrolled`);
       setOpen(false);
       window.dispatchEvent(new CustomEvent(`campaign-enrollment-updated-${campaignId}`));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to enroll influencer";
+      const message = error instanceof Error ? error.message : `Failed to enroll ${singleLabel}`;
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -98,26 +102,26 @@ export function CampaignEnrollmentManager({ campaignId }: Props) {
     <>
       <Button size="sm" className="bg-rose-600 hover:bg-rose-700 gap-2" onClick={() => void onOpenChange(true)}>
         <Plus className="h-4 w-4" />
-        Enroll Influencer
+        Enroll {titleLabel}
       </Button>
 
       <Dialog open={open} onOpenChange={(next) => void onOpenChange(next)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enroll Influencer</DialogTitle>
+            <DialogTitle>Enroll {titleLabel}</DialogTitle>
           </DialogHeader>
 
           {loading ? (
-            <p className="text-sm text-gray-500">Loading available influencers...</p>
+            <p className="text-sm text-gray-500">Loading available {singleLabel}s...</p>
           ) : availableCandidates.length === 0 ? (
-            <p className="text-sm text-gray-500">No available influencers found to enroll.</p>
+            <p className="text-sm text-gray-500">No available {singleLabel}s found to enroll.</p>
           ) : (
             <div className="space-y-3">
               <div>
-                <Label>Influencer</Label>
+                <Label>{titleLabel}</Label>
                 <Select value={candidateId} onValueChange={setCandidateId}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select influencer" />
+                    <SelectValue placeholder={`Select ${singleLabel}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableCandidates.map((candidate) => (

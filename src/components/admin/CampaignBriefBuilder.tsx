@@ -28,6 +28,7 @@ type CampaignBriefContent = {
 
 type Props = {
   campaignId: string;
+  campaignType: "influencer" | "ugc" | "affiliate";
   initialBrief: string;
   initialBriefUrl: string;
   initialBriefContent?: CampaignBriefContent | null;
@@ -102,6 +103,14 @@ const SECTION_DEFS: Array<{ key: keyof CampaignBriefContent; label: string; plac
     placeholder: "Practical examples of what to do and what to avoid.",
   },
 ];
+
+function getSectionDefs(campaignType: "influencer" | "ugc" | "affiliate") {
+  return SECTION_DEFS.filter((section) => {
+    if (campaignType === "ugc" && section.key === "taggingHashtags") return false;
+    if ((campaignType === "ugc" || campaignType === "affiliate") && section.key === "ftcDisclosure") return false;
+    return true;
+  });
+}
 
 function buildShareUrl(appUrl: string | null | undefined, token: string | null | undefined) {
   if (!token) return "";
@@ -203,6 +212,7 @@ function RichTextEditor({
 
 export function CampaignBriefBuilder({
   campaignId,
+  campaignType,
   initialBrief,
   initialBriefUrl,
   initialBriefContent,
@@ -217,6 +227,7 @@ export function CampaignBriefBuilder({
   const [saving, setSaving] = useState(false);
 
   const shareUrl = buildShareUrl(appUrl, briefShareToken);
+  const visibleSections = getSectionDefs(campaignType);
 
   async function saveBrief() {
     setSaving(true);
@@ -350,7 +361,7 @@ export function CampaignBriefBuilder({
         </div>
 
         <div className="space-y-4">
-          {SECTION_DEFS.map((section) => (
+          {visibleSections.map((section) => (
             <RichTextEditor
               key={section.key}
               label={section.label}

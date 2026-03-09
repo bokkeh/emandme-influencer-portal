@@ -76,10 +76,10 @@ export default async function InfluencerDashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back{user.firstName ? `, ${user.firstName}` : ""}! 👋
-        </h1>
-        <p className="text-sm text-gray-500">Here's what's happening with your campaigns</p>
+        <h1 className="text-2xl font-bold text-gray-900">Your home for Em &amp; Me campaigns.</h1>
+        <p className="text-sm text-gray-500">
+          Upload content, review feedback, and keep track of everything you create with us.
+        </p>
       </div>
 
       {/* KPIs */}

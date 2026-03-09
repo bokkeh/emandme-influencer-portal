@@ -109,7 +109,7 @@ export default async function InfluencerCampaignsPage() {
                   <div className="mt-4 flex flex-wrap gap-6 text-sm">
                     {campaign.agreedFee && (
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">YOUR FEE</p>
+                        <p className="text-xs text-gray-400 font-medium">YOUR PAY</p>
                         <p className="font-semibold text-gray-900">${Number(campaign.agreedFee).toFixed(2)}</p>
                       </div>
                     )}

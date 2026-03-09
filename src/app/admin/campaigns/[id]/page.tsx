@@ -204,6 +204,12 @@ export default async function CampaignDetailPage({
 
   if (!campaign) notFound();
 
+  const campaignType = (campaign.campaignType as "influencer" | "ugc" | "affiliate" | null) ?? "influencer";
+  const creatorLabel = campaignType === "influencer" ? "Influencer" : "Creator";
+  const creatorsLabel = campaignType === "influencer" ? "Influencers" : "Creators";
+  const summaryGroupLabel =
+    campaignType === "ugc" ? "UGC Creators" : campaignType === "affiliate" ? "Affiliates" : "Influencers";
+
   const products =
     ((campaign.products as Array<{
       shopifyProductId?: string;
@@ -239,9 +245,12 @@ export default async function CampaignDetailPage({
       description: "Complete key sections in the campaign brief.",
     },
     {
-      label: "Enroll influencers",
+      label: campaignType === "influencer" ? "Enroll influencers" : "Enroll creators",
       done: enrollments.length > 0,
-      description: "Add at least one influencer from your roster.",
+      description:
+        campaignType === "influencer"
+          ? "Add at least one influencer from your roster."
+          : "Add at least one creator from your roster.",
     },
     {
       label: "Ship product",
@@ -290,11 +299,11 @@ export default async function CampaignDetailPage({
                     initialTotalBudget={campaign.totalBudget}
                     initialStartDate={campaign.startDate}
                     initialEndDate={campaign.endDate}
-                    initialCampaignType={(campaign.campaignType as "influencer" | "ugc" | "affiliate" | null) ?? "influencer"}
+                    initialCampaignType={campaignType}
                   />
                 </div>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600">
-                  {(campaign.campaignType as string) ?? "influencer"}
+                  {campaignType}
                 </span>
                 {campaign.status !== "draft" ? <StatusBadge status={campaign.status} /> : null}
               </div>
@@ -335,7 +344,7 @@ export default async function CampaignDetailPage({
               <p className="text-lg font-bold text-gray-900">{campaign.totalOrders}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 font-medium">INFLUENCERS</p>
+              <p className="text-xs text-gray-400 font-medium">{summaryGroupLabel.toUpperCase()}</p>
               <p className="text-lg font-bold text-gray-900">{enrollments.length}</p>
             </div>
           </div>
@@ -365,7 +374,7 @@ export default async function CampaignDetailPage({
         </Link>
         <Link href={`/admin/campaigns/${id}?tab=enrolled`}>
           <Button variant={activeTab === "enrolled" ? "default" : "outline"} size="sm">
-            Enrolled Influencers
+            Enrolled {creatorsLabel}
           </Button>
         </Link>
         <Link href={`/admin/campaigns/${id}?tab=content`}>
@@ -379,6 +388,7 @@ export default async function CampaignDetailPage({
         <div className="grid gap-4 lg:grid-cols-2">
           <CampaignBriefBuilder
             campaignId={id}
+            campaignType={campaignType}
             initialBrief={campaign.description ?? ""}
             initialBriefUrl={campaign.briefUrl ?? ""}
             initialBriefContent={campaign.briefContent ?? {}}
@@ -394,7 +404,7 @@ export default async function CampaignDetailPage({
       ) : null}
 
       {activeTab === "enrolled" ? (
-        <CampaignEnrolledSection campaignId={id} initialRows={enrollments} />
+        <CampaignEnrolledSection campaignId={id} initialRows={enrollments} campaignType={campaignType} />
       ) : null}
 
       {activeTab === "content" ? (

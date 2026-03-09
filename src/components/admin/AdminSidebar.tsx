@@ -36,15 +36,26 @@ export const ADMIN_NAV_ITEMS = [
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
-export function AdminSidebar({ showViewToggle = false }: { showViewToggle?: boolean }) {
+export function AdminSidebar({
+  showViewToggle = false,
+  logoDarkUrl = null,
+}: {
+  showViewToggle?: boolean;
+  logoDarkUrl?: string | null;
+}) {
   const pathname = usePathname();
 
   return (
     <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
       <div className="flex h-16 items-center border-b border-gray-200 px-6">
-        <div>
-          <p className="text-sm font-bold text-rose-600 leading-tight">Em & Me Studio</p>
-          <p className="text-xs text-gray-500">Admin Portal</p>
+        <div className="flex items-center gap-3">
+          {logoDarkUrl ? (
+            <img src={logoDarkUrl} alt="Em & Me Studio" className="h-7 w-auto object-contain" />
+          ) : null}
+          <div>
+            <p className="text-sm font-bold text-rose-600 leading-tight">Em & Me Studio</p>
+            <p className="text-xs text-gray-500">Admin Portal</p>
+          </div>
         </div>
       </div>
 

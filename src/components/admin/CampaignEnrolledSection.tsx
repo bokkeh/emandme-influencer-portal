@@ -28,6 +28,7 @@ type EnrollmentRow = {
 type Props = {
   campaignId: string;
   initialRows: EnrollmentRow[];
+  campaignType?: "influencer" | "ugc" | "affiliate";
 };
 
 function initialsFor(name: string) {
@@ -54,8 +55,13 @@ function deriveNameParts(row: EnrollmentRow) {
   };
 }
 
-export function CampaignEnrolledSection({ campaignId, initialRows }: Props) {
+export function CampaignEnrolledSection({
+  campaignId,
+  initialRows,
+  campaignType = "influencer",
+}: Props) {
   const [rows, setRows] = useState(initialRows);
+  const creatorsLabel = campaignType === "influencer" ? "Influencers" : "Creators";
 
   const profileCards = useMemo(() => {
     const uniqueByInfluencer = new Map<string, EnrollmentRow>();
@@ -68,8 +74,8 @@ export function CampaignEnrolledSection({ campaignId, initialRows }: Props) {
   return (
     <Card className="border border-gray-200 shadow-sm">
       <div className="flex items-center justify-between p-6 pb-3">
-        <p className="text-base font-semibold text-gray-900">Enrolled Influencers ({rows.length})</p>
-        <CampaignEnrollmentManager campaignId={campaignId} />
+        <p className="text-base font-semibold text-gray-900">Enrolled {creatorsLabel} ({rows.length})</p>
+        <CampaignEnrollmentManager campaignId={campaignId} campaignType={campaignType} />
       </div>
 
       {profileCards.length > 0 ? (
@@ -119,7 +125,12 @@ export function CampaignEnrolledSection({ campaignId, initialRows }: Props) {
       ) : null}
 
       <CardContent className="p-0">
-        <CampaignEnrollmentPipelineTable campaignId={campaignId} rows={rows} onRowsChange={setRows} />
+        <CampaignEnrollmentPipelineTable
+          campaignId={campaignId}
+          rows={rows}
+          onRowsChange={setRows}
+          campaignType={campaignType}
+        />
       </CardContent>
     </Card>
   );

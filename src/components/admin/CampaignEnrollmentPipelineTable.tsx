@@ -42,11 +42,18 @@ type Props = {
   campaignId: string;
   rows: EnrollmentRow[];
   onRowsChange?: (rows: EnrollmentRow[]) => void;
+  campaignType?: "influencer" | "ugc" | "affiliate";
 };
 
-export function CampaignEnrollmentPipelineTable({ campaignId, rows, onRowsChange }: Props) {
+export function CampaignEnrollmentPipelineTable({
+  campaignId,
+  rows,
+  onRowsChange,
+  campaignType = "influencer",
+}: Props) {
   const [items, setItems] = useState(rows);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const singleLabel = campaignType === "influencer" ? "Influencer" : "Creator";
 
   useEffect(() => {
     setItems(rows);
@@ -58,7 +65,7 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows, onRowsChange
     async function refreshEnrolledRows() {
       try {
         const res = await fetch(`/api/campaigns/${campaignId}/enrollments?mode=enrolled`, { cache: "no-store" });
-        if (!res.ok) throw new Error((await res.text()) || "Failed to refresh enrolled influencers");
+        if (!res.ok) throw new Error((await res.text()) || `Failed to refresh enrolled ${singleLabel.toLowerCase()}s`);
         const nextRows = (await res.json()) as EnrollmentRow[];
         if (!active) return;
         setItems(nextRows);
@@ -106,7 +113,7 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows, onRowsChange
   }
 
   if (items.length === 0) {
-    return <p className="py-8 text-center text-sm text-gray-400">No influencers enrolled yet</p>;
+    return <p className="py-8 text-center text-sm text-gray-400">No {singleLabel.toLowerCase()}s enrolled yet</p>;
   }
 
   return (
@@ -114,7 +121,7 @@ export function CampaignEnrollmentPipelineTable({ campaignId, rows, onRowsChange
       <table className="min-w-[980px] w-full text-sm">
         <thead className="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Influencer</th>
+          <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">{singleLabel}</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Status</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Pipeline</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Contract</th>

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FaviconSettingsCard } from "@/components/admin/FaviconSettingsCard";
+import { BrandLogoSettingsCard } from "@/components/admin/BrandLogoSettingsCard";
 import { HubSpotSyncTestCard } from "@/components/admin/HubSpotSyncTestCard";
 import { GoogleChatNotificationSettingsCard } from "@/components/admin/GoogleChatNotificationSettingsCard";
 
@@ -13,6 +14,7 @@ export default function SettingsPage() {
       </div>
 
       <FaviconSettingsCard />
+      <BrandLogoSettingsCard />
       <HubSpotSyncTestCard />
 
       <Card className="border border-gray-200 shadow-sm">

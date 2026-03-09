@@ -221,7 +221,7 @@ export default async function InfluencerCampaignDetailPage({
           <div className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
             {enrollment.agreedFee && (
               <div>
-                <p className="text-xs font-medium text-gray-400">YOUR FEE</p>
+                <p className="text-xs font-medium text-gray-400">YOUR PAY</p>
                 <p className="text-lg font-bold text-gray-900">${Number(enrollment.agreedFee).toFixed(2)}</p>
               </div>
             )}

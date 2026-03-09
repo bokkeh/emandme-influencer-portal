@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ViewModeToggle } from "@/components/shared/ViewModeToggle";
 
-export function AdminMobileHeader({ showViewToggle = false }: { showViewToggle?: boolean }) {
+export function AdminMobileHeader({
+  showViewToggle = false,
+  logoDarkUrl = null,
+}: {
+  showViewToggle?: boolean;
+  logoDarkUrl?: string | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -25,9 +31,14 @@ export function AdminMobileHeader({ showViewToggle = false }: { showViewToggle?:
         <SheetContent side="left" className="w-[86vw] max-w-[320px] p-0">
           <div className="flex h-full flex-col bg-white">
             <div className="flex h-14 items-center border-b border-gray-200 px-4">
-              <div>
-                <p className="text-sm font-bold leading-tight text-rose-600">Em & Me Studio</p>
-                <p className="text-xs text-gray-500">Admin Portal</p>
+              <div className="flex items-center gap-2">
+                {logoDarkUrl ? (
+                  <img src={logoDarkUrl} alt="Em & Me Studio" className="h-6 w-auto object-contain" />
+                ) : null}
+                <div>
+                  <p className="text-sm font-bold leading-tight text-rose-600">Em & Me Studio</p>
+                  <p className="text-xs text-gray-500">Admin Portal</p>
+                </div>
               </div>
             </div>
             <nav className="flex-1 overflow-y-auto py-3">
@@ -66,7 +77,11 @@ export function AdminMobileHeader({ showViewToggle = false }: { showViewToggle?:
       </Sheet>
 
       <div className="flex items-center">
-        <p className="text-sm font-bold text-rose-600">Em & Me Studio</p>
+        {logoDarkUrl ? (
+          <img src={logoDarkUrl} alt="Em & Me Studio" className="h-6 w-auto object-contain" />
+        ) : (
+          <p className="text-sm font-bold text-rose-600">Em & Me Studio</p>
+        )}
       </div>
 
       <div className="flex items-center gap-1.5">

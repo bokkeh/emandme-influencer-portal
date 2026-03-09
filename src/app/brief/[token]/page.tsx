@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, campaigns } from "@/lib/db";
+import { DEFAULT_EM_ME_LOGO_DARK_URL, getBrandingSettings } from "@/lib/branding";
 
 type CampaignBriefContent = {
   heroImageUrl?: string;
@@ -35,6 +36,20 @@ const BRIEF_SECTIONS: Array<{ key: keyof CampaignBriefContent; title: string }> 
   { key: "dosAndDonts", title: "Do's and Don'ts" },
 ];
 
+function getVisibleSections(campaignType: "influencer" | "ugc" | "affiliate") {
+  return BRIEF_SECTIONS.filter((section) => {
+    if (campaignType === "ugc" && section.key === "taggingHashtags") return false;
+    if ((campaignType === "ugc" || campaignType === "affiliate") && section.key === "ftcDisclosure") return false;
+    return true;
+  });
+}
+
+function getTypeBadgeLabel(campaignType: "influencer" | "ugc" | "affiliate") {
+  if (campaignType === "ugc") return "UGC";
+  if (campaignType === "affiliate") return "Affiliate";
+  return null;
+}
+
 export default async function PublicCampaignBriefPage({
   params,
 }: {
@@ -42,6 +57,7 @@ export default async function PublicCampaignBriefPage({
 }) {
   const { token } = await params;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+  const branding = await getBrandingSettings();
   const [campaign] = await db
     .select({
       id: campaigns.id,
@@ -49,6 +65,8 @@ export default async function PublicCampaignBriefPage({
       description: campaigns.description,
       briefUrl: campaigns.briefUrl,
       briefContent: campaigns.briefContent,
+      campaignType: campaigns.campaignType,
+      products: campaigns.products,
     })
     .from(campaigns)
     .where(eq(campaigns.briefShareToken, token))
@@ -58,7 +76,19 @@ export default async function PublicCampaignBriefPage({
 
   const briefContent = (campaign.briefContent ?? {}) as CampaignBriefContent;
   const heroImageUrl = briefContent.heroImageUrl?.trim() ?? "";
-  const hasStructuredContent = BRIEF_SECTIONS.some((section) => Boolean(briefContent[section.key]?.trim()));
+  const campaignType = (campaign.campaignType as "influencer" | "ugc" | "affiliate" | null) ?? "influencer";
+  const sectionDefs = getVisibleSections(campaignType);
+  const typeBadge = getTypeBadgeLabel(campaignType);
+  const hasStructuredContent = sectionDefs.some((section) => Boolean(briefContent[section.key]?.trim()));
+  const featuredProducts =
+    ((campaign.products as Array<{ title?: string; imageUrl?: string; imageUrls?: string[]; variantId?: string }>) ?? [])
+      .map((p, index) => {
+        const imageUrl = p.imageUrl ?? p.imageUrls?.[0] ?? "";
+        const title = (p.title ?? "").trim() || `Product ${index + 1}`;
+        return { title, imageUrl, variantId: p.variantId ?? "" };
+      })
+      .filter((p) => p.title);
+  const logoUrl = branding.logoDarkUrl ?? DEFAULT_EM_ME_LOGO_DARK_URL;
   const joinCampaignUrl = appUrl ? `${appUrl}/api/brief/${token}/join` : `/api/brief/${token}/join`;
 
   return (
@@ -70,12 +100,15 @@ export default async function PublicCampaignBriefPage({
           </div>
         ) : null}
         <div className="mb-6 flex justify-center p-[15px]">
-          <img
-            src="https://emandmestudio.com/cdn/shop/files/black_logo_2x_a2bcf09e-ea61-4b77-8ca2-4f82c02e5c3f_220x.png?v=1619480991"
-            alt="Em & Me Studio"
-            className="h-9 w-auto"
-          />
+          <img src={logoUrl} alt="Em & Me Studio" className="h-9 w-auto" />
         </div>
+        {typeBadge ? (
+          <div className="mb-2">
+            <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700">
+              {typeBadge}
+            </span>
+          </div>
+        ) : null}
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">{campaign.title}</h1>
         {campaign.description ? <p className="mt-3 whitespace-pre-wrap text-sm text-gray-600">{campaign.description}</p> : null}
         {campaign.briefUrl ? (
@@ -92,9 +125,31 @@ export default async function PublicCampaignBriefPage({
           </p>
         ) : null}
 
+        {featuredProducts.length > 0 ? (
+          <section className="mt-8 border-t border-gray-200 pt-5">
+            <h2 className="text-lg font-semibold text-gray-900">Featured Products</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {featuredProducts.map((product, index) => (
+                <div key={`${product.title}-${index}`} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                  <div className="flex h-36 items-center justify-center bg-gray-50">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-gray-400">No image</span>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="text-sm font-semibold text-gray-900">{product.title}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {hasStructuredContent ? (
           <div className="mt-8 space-y-6">
-            {BRIEF_SECTIONS.map((section) => {
+            {sectionDefs.map((section) => {
               const value = briefContent[section.key]?.trim();
               if (!value) return null;
               return (

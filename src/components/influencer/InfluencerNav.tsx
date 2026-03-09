@@ -17,7 +17,13 @@ const NAV_ITEMS = [
   { label: "Profile", href: "/influencer/profile" },
 ];
 
-export function InfluencerNav({ showViewToggle = false }: { showViewToggle?: boolean }) {
+export function InfluencerNav({
+  showViewToggle = false,
+  logoDarkUrl = null,
+}: {
+  showViewToggle?: boolean;
+  logoDarkUrl?: string | null;
+}) {
   const pathname = usePathname();
 
   return (
@@ -26,7 +32,11 @@ export function InfluencerNav({ showViewToggle = false }: { showViewToggle?: boo
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-0 sm:px-6">
           <div className="flex items-center gap-8">
             <div className="py-4">
-              <p className="text-sm font-bold text-rose-600">Em & Me Studio</p>
+              {logoDarkUrl ? (
+                <img src={logoDarkUrl} alt="Em & Me Studio" className="h-7 w-auto object-contain" />
+              ) : (
+                <p className="text-sm font-bold text-rose-600">Em & Me Studio</p>
+              )}
             </div>
             <div className="hidden items-center gap-1 sm:flex">
               {NAV_ITEMS.map(({ label, href }) => (
