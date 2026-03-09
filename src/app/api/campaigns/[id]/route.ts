@@ -54,8 +54,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         shopifyProductId: string;
         title: string;
         imageUrl?: string;
+        imageUrls?: string[];
         variantId?: string;
       }> | null;
+      campaignType?: "influencer" | "ugc" | "affiliate";
       platforms?: Array<"instagram" | "tiktok" | "youtube" | "pinterest" | "blog"> | null;
       status?: "draft" | "active" | "paused" | "completed" | "cancelled";
       totalBudget?: number | string | null;
@@ -81,6 +83,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       briefUrl: body.briefUrl !== undefined ? (body.briefUrl?.trim() || null) : undefined,
       briefContent: body.briefContent !== undefined ? body.briefContent ?? {} : undefined,
       products: body.products !== undefined ? body.products ?? [] : undefined,
+      campaignType:
+        body.campaignType !== undefined
+          ? body.campaignType === "ugc" || body.campaignType === "affiliate"
+            ? body.campaignType
+            : "influencer"
+          : undefined,
       platforms: body.platforms !== undefined ? body.platforms ?? [] : undefined,
       briefShareToken,
       status: body.status,

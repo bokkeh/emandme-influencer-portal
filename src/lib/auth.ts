@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-export type UserRole = "admin" | "influencer" | "ugc_creator";
+export type UserRole = "admin" | "influencer" | "ugc_creator" | "affiliate";
 
 export async function requireAuth() {
   const { userId } = await auth();
@@ -53,12 +53,12 @@ export async function requireInfluencer() {
   let role = (sessionClaims?.metadata as { role?: string })?.role as UserRole | undefined;
 
   // JWT claims can be stale right after onboarding — fall back to DB
-  if (!role || (role !== "influencer" && role !== "ugc_creator" && role !== "admin")) {
+  if (!role || (role !== "influencer" && role !== "ugc_creator" && role !== "affiliate" && role !== "admin")) {
     const [dbUser] = await db.select({ role: users.role }).from(users).where(eq(users.clerkUserId, userId)).limit(1);
     role = dbUser?.role as UserRole | undefined;
   }
 
-  if (role !== "influencer" && role !== "ugc_creator") {
+  if (role !== "influencer" && role !== "ugc_creator" && role !== "affiliate") {
     if (role === "admin") {
       const superAdmin = await isSuperAdminByUserId(userId);
       if (!superAdmin) redirect("/admin/dashboard");

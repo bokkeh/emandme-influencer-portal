@@ -35,6 +35,7 @@ export default async function CampaignsPage() {
     startDate: Date | null;
     endDate: Date | null;
     createdAt: Date;
+    campaignType: string;
   }> = [];
   let schemaError: string | null = null;
 
@@ -50,6 +51,7 @@ export default async function CampaignsPage() {
         startDate: campaigns.startDate,
         endDate: campaigns.endDate,
         createdAt: campaigns.createdAt,
+        campaignType: campaigns.campaignType,
       })
       .from(campaigns)
       .orderBy(campaigns.createdAt);
@@ -108,7 +110,12 @@ export default async function CampaignsPage() {
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="font-semibold text-gray-900 leading-tight">{campaign.title}</h3>
-                    <StatusBadge status={campaign.status} />
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600">
+                        {campaign.campaignType}
+                      </span>
+                      <StatusBadge status={campaign.status} />
+                    </div>
                   </div>
 
                   {/* Platforms */}
@@ -141,7 +148,7 @@ export default async function CampaignsPage() {
                     <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400">
                       <CalendarDays className="h-3.5 w-3.5" />
                       {campaign.startDate && format(new Date(campaign.startDate), "MMM d")}
-                      {campaign.startDate && campaign.endDate && " — "}
+                      {campaign.startDate && campaign.endDate && " - "}
                       {campaign.endDate && format(new Date(campaign.endDate), "MMM d, yyyy")}
                     </div>
                   )}

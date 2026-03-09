@@ -339,7 +339,7 @@ export function ShippingTrackerClient({
               onChange={(e) => setSearch(e.target.value)}
             />
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[1100px] table-fixed">
                 <TableHeader>
                   <TableRow className="bg-gray-50">
                     <TableHead>Influencer</TableHead>
@@ -367,7 +367,7 @@ export function ShippingTrackerClient({
                             {name}
                           </Link>
                         </TableCell>
-                        <TableCell className="max-w-[300px]">
+                        <TableCell className="max-w-[420px] align-top">
                           {s.products && s.products.length > 0 ? (
                             <div className="space-y-1">
                               {s.products.map((p, idx) => (
@@ -376,7 +376,7 @@ export function ShippingTrackerClient({
                                     {p.name} x{p.qty}
                                   </p>
                                   {p.personalizationText ? (
-                                    <p className="mt-0.5 text-xs text-gray-500">
+                                    <p className="mt-0.5 whitespace-normal break-words text-xs leading-relaxed text-gray-500">
                                       Personalization: {p.personalizationText}
                                     </p>
                                   ) : null}
@@ -387,7 +387,7 @@ export function ShippingTrackerClient({
                             <span className="text-sm text-gray-400">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="space-y-2">
+                        <TableCell className="min-w-[180px] space-y-2 align-top">
                           <StatusBadge status={s.status} />
                           <Select
                             value={s.status}

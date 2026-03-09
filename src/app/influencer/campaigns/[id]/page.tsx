@@ -23,6 +23,15 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
+function sanitizePlainText(value: string | null | undefined) {
+  return (value ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default async function InfluencerCampaignDetailPage({
   params,
 }: {
@@ -79,6 +88,7 @@ export default async function InfluencerCampaignDetailPage({
       campaignTitle: campaigns.title,
       campaignDescription: campaigns.description,
       campaignStatus: campaigns.status,
+      campaignType: campaigns.campaignType,
       campaignPlatforms: campaigns.platforms,
       briefUrl: campaigns.briefUrl,
       startDate: campaigns.startDate,
@@ -166,13 +176,21 @@ export default async function InfluencerCampaignDetailPage({
     { label: "Submitted pet tag info", done: petInfoSubmitted },
     { label: "Product shipped", done: Boolean(shipment[0]) },
     { label: "Content submitted for approval", done: Boolean(submittedAsset[0]), href: `/influencer/upload?campaignId=${id}` },
-    { label: "Post published", done: Boolean(publishedAsset[0]) },
+    { label: enrollment.campaignType === "ugc" ? "Review / approval complete" : "Post published", done: Boolean(publishedAsset[0]) },
     { label: "Payment sent", done: Boolean(paidPayment[0]) },
   ];
 
   const utmLink = myUTMLink[0] ?? null;
   const discountCode = myDiscountCode[0] ?? null;
-  const deliverables = (enrollment.deliverables as Array<{id:string;type:string;platform:string;dueDate:string;status:string;notes?:string}>) ?? [];
+  const deliverables =
+    (enrollment.deliverables as Array<{
+      id: string;
+      type: string;
+      platform: string;
+      dueDate: string;
+      status: string;
+      notes?: string;
+    }>) ?? [];
 
   return (
     <div className="space-y-6">
@@ -183,7 +201,6 @@ export default async function InfluencerCampaignDetailPage({
         </Button>
       </Link>
 
-      {/* Campaign Header */}
       <Card className="border border-gray-200 shadow-sm">
         <CardContent className="p-6">
           <div className="flex items-start justify-between gap-4">
@@ -201,28 +218,30 @@ export default async function InfluencerCampaignDetailPage({
             <StatusBadge status={enrollment.status} />
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
+          <div className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
             {enrollment.agreedFee && (
               <div>
-                <p className="text-xs text-gray-400 font-medium">YOUR FEE</p>
+                <p className="text-xs font-medium text-gray-400">YOUR FEE</p>
                 <p className="text-lg font-bold text-gray-900">${Number(enrollment.agreedFee).toFixed(2)}</p>
               </div>
             )}
             {enrollment.contentDueDate && (
               <div>
-                <p className="text-xs text-gray-400 font-medium">CONTENT DUE</p>
-                <p className="content-due-gradient mt-1 text-lg font-bold">{format(new Date(enrollment.contentDueDate), "MMM d, yyyy")}</p>
+                <p className="text-xs font-medium text-gray-400">CONTENT DUE</p>
+                <p className="content-due-gradient mt-1 text-lg font-bold">
+                  {format(new Date(enrollment.contentDueDate), "MMM d, yyyy")}
+                </p>
               </div>
             )}
             {enrollment.startDate && (
               <div>
-                <p className="text-xs text-gray-400 font-medium">START</p>
+                <p className="text-xs font-medium text-gray-400">START</p>
                 <p className="font-medium text-gray-700">{format(new Date(enrollment.startDate), "MMM d, yyyy")}</p>
               </div>
             )}
             {enrollment.endDate && (
               <div>
-                <p className="text-xs text-gray-400 font-medium">END</p>
+                <p className="text-xs font-medium text-gray-400">END</p>
                 <p className="font-medium text-gray-700">{format(new Date(enrollment.endDate), "MMM d, yyyy")}</p>
               </div>
             )}
@@ -241,7 +260,6 @@ export default async function InfluencerCampaignDetailPage({
         </CardContent>
       </Card>
 
-      {/* UTM Link & Discount Code */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader>
@@ -250,8 +268,8 @@ export default async function InfluencerCampaignDetailPage({
           <CardContent>
             {utmLink ? (
               <div className="space-y-3">
-                <div className="rounded-lg bg-rose-50 border border-rose-200 p-3">
-                  <p className="font-mono text-xs text-gray-700 break-all">{utmLink.fullUrl}</p>
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                  <p className="break-all font-mono text-xs text-gray-700">{utmLink.fullUrl}</p>
                 </div>
                 <div className="flex gap-2">
                   <CopyButton text={utmLink.fullUrl} label="Copy Link" />
@@ -265,7 +283,7 @@ export default async function InfluencerCampaignDetailPage({
                 <p className="text-xs text-gray-400">{utmLink.clicks} clicks tracked</p>
               </div>
             ) : (
-              <p className="text-sm text-gray-400">No tracking link assigned yet — check back soon!</p>
+              <p className="text-sm text-gray-400">No tracking link assigned yet - check back soon!</p>
             )}
           </CardContent>
         </Card>
@@ -277,9 +295,9 @@ export default async function InfluencerCampaignDetailPage({
           <CardContent>
             {discountCode ? (
               <div className="space-y-3">
-                <div className="rounded-lg bg-purple-50 border border-purple-200 p-4 text-center">
+                <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 text-center">
                   <p className="font-mono text-2xl font-bold text-purple-900">{discountCode.code}</p>
-                  <p className="text-sm text-purple-700 mt-1">
+                  <p className="mt-1 text-sm text-purple-700">
                     {discountCode.discountType === "percentage"
                       ? `${discountCode.discountValue}% off`
                       : `$${discountCode.discountValue} off`}
@@ -287,43 +305,56 @@ export default async function InfluencerCampaignDetailPage({
                 </div>
                 <CopyButton text={discountCode.code} label="Copy Code" />
                 <div className="text-xs text-gray-400">
-                  <p>{discountCode.usageCount} uses · ${Number(discountCode.revenueGenerated).toFixed(2)} revenue generated</p>
+                  <p>
+                    {discountCode.usageCount} uses - ${Number(discountCode.revenueGenerated).toFixed(2)} revenue generated
+                  </p>
                   {discountCode.expiresAt && (
                     <p>Expires {format(new Date(discountCode.expiresAt), "MMM d, yyyy")}</p>
                   )}
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-400">No discount code assigned yet — check back soon!</p>
+              <p className="text-sm text-gray-400">No discount code assigned yet - check back soon!</p>
             )}
           </CardContent>
         </Card>
       </div>
 
-{/* Deliverables */}
       {deliverables.length > 0 && (
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Your Deliverables</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="grid gap-3 sm:grid-cols-2">
             {deliverables.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
-                <div className={`h-4 w-4 rounded-full border-2 flex-shrink-0 ${
-                  d.status === "approved" ? "bg-green-500 border-green-500" :
-                  d.status === "submitted" ? "bg-blue-500 border-blue-500" :
-                  "border-gray-300"
-                }`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900 capitalize">
-                    {d.type.replace(/_/g, " ")} — {d.platform}
-                  </p>
-                  {d.dueDate && (
-                    <p className="text-xs text-gray-400">Due {format(new Date(d.dueDate), "MMM d, yyyy")}</p>
-                  )}
-                  {d.notes && <p className="text-xs text-gray-500 mt-0.5">{d.notes}</p>}
+              <div key={d.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-1 h-3 w-3 flex-shrink-0 rounded-full border-2 ${
+                      d.status === "approved"
+                        ? "border-green-500 bg-green-500"
+                        : d.status === "submitted"
+                          ? "border-blue-500 bg-blue-500"
+                          : "border-gray-300"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium capitalize text-gray-900">
+                      {sanitizePlainText(d.type.replace(/_/g, " "))} - {sanitizePlainText(d.platform)}
+                    </p>
+                    {d.dueDate && (
+                      <p className="text-xs text-gray-400">Due {format(new Date(d.dueDate), "MMM d, yyyy")}</p>
+                    )}
+                    {sanitizePlainText(d.notes) ? (
+                      <p className="mt-1 whitespace-normal break-words text-xs text-gray-500">
+                        {sanitizePlainText(d.notes)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                <StatusBadge status={d.status} />
+                <div className="mt-2">
+                  <StatusBadge status={d.status} />
+                </div>
               </div>
             ))}
           </CardContent>
@@ -332,6 +363,7 @@ export default async function InfluencerCampaignDetailPage({
 
       <CampaignProgressCard
         campaignId={id}
+        campaignType={(enrollment.campaignType as "influencer" | "ugc" | "affiliate" | null) ?? "influencer"}
         canSubmitPetInfo={joinedCampaign}
         profileComplete={profileComplete}
         checklist={checklist}
@@ -366,9 +398,6 @@ export default async function InfluencerCampaignDetailPage({
           selectedProductVariantId: enrollment.selectedProductVariantId ?? "",
         }}
       />
-
-      
     </div>
   );
 }
-

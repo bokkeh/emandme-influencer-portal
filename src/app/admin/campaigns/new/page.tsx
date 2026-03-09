@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Megaphone } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -18,6 +25,7 @@ export default function NewCampaignPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [campaignType, setCampaignType] = useState<"influencer" | "ugc" | "affiliate">("influencer");
 
   function togglePlatform(p: string) {
     setSelectedPlatforms((prev) =>
@@ -32,6 +40,7 @@ export default function NewCampaignPage() {
     const data = {
       ...Object.fromEntries(formData),
       platforms: selectedPlatforms,
+      campaignType,
     };
 
     try {
@@ -80,6 +89,19 @@ export default function NewCampaignPage() {
             <div>
               <Label>Description</Label>
               <Textarea name="description" placeholder="Campaign overview and goals..." rows={3} />
+            </div>
+            <div>
+              <Label>Campaign Type</Label>
+              <Select value={campaignType} onValueChange={(value) => setCampaignType(value as "influencer" | "ugc" | "affiliate")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="influencer">Influencer</SelectItem>
+                  <SelectItem value="ugc">UGC</SelectItem>
+                  <SelectItem value="affiliate">Affiliate</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

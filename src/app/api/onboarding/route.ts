@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
     const { role } = await req.json();
-    if (!["influencer", "ugc_creator"].includes(role)) {
+    if (!["influencer", "ugc_creator", "affiliate"].includes(role)) {
       return new NextResponse("Invalid role", { status: 400 });
     }
 

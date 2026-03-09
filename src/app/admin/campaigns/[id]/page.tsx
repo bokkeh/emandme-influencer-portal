@@ -290,8 +290,12 @@ export default async function CampaignDetailPage({
                     initialTotalBudget={campaign.totalBudget}
                     initialStartDate={campaign.startDate}
                     initialEndDate={campaign.endDate}
+                    initialCampaignType={(campaign.campaignType as "influencer" | "ugc" | "affiliate" | null) ?? "influencer"}
                   />
                 </div>
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600">
+                  {(campaign.campaignType as string) ?? "influencer"}
+                </span>
                 {campaign.status !== "draft" ? <StatusBadge status={campaign.status} /> : null}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1.5">

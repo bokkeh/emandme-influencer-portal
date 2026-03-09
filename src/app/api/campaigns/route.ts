@@ -49,9 +49,12 @@ export async function POST(req: Request) {
     if (role !== "admin") return new NextResponse("Forbidden", { status: 403 });
 
     const body = await req.json();
-    const { title, description, totalBudget, startDate, endDate, platforms, hubspotDealId } = body;
+    const { title, description, totalBudget, startDate, endDate, platforms, hubspotDealId, campaignType } = body;
 
     if (!title) return new NextResponse("Title required", { status: 400 });
+
+    const normalizedCampaignType =
+      campaignType === "ugc" || campaignType === "affiliate" ? campaignType : "influencer";
 
     const [user] = await db
       .select({ id: users.id })
@@ -63,6 +66,7 @@ export async function POST(req: Request) {
       .insert(campaigns)
       .values({
         title,
+        campaignType: normalizedCampaignType,
         description: description || null,
         totalBudget: totalBudget ? String(totalBudget) : null,
         startDate: startDate ? new Date(startDate) : null,

@@ -22,6 +22,7 @@ export const userRoleEnum = pgEnum("user_role", [
   "admin",
   "influencer",
   "ugc_creator",
+  "affiliate",
 ]);
 
 export const influencerTierEnum = pgEnum("influencer_tier", [
@@ -89,6 +90,7 @@ export const paymentTypeEnum = pgEnum("payment_type", [
   "bonus",
   "gift_card",
   "product_credit",
+  "affiliate_commission",
 ]);
 
 export const shipmentStatusEnum = pgEnum("shipment_status", [
@@ -380,6 +382,7 @@ export const campaigns = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     title: varchar("title", { length: 200 }).notNull(),
+    campaignType: varchar("campaign_type", { length: 20 }).notNull().default("influencer"),
     description: text("description"),
     briefUrl: text("brief_url"),
     briefContent: jsonb("brief_content").$type<CampaignBriefContent>().notNull().default({}),

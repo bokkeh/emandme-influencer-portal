@@ -31,7 +31,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = (await req.json()) as {
-      role?: "admin" | "influencer" | "ugc_creator";
+      role?: "admin" | "influencer" | "ugc_creator" | "affiliate";
       isActive?: boolean;
     };
 
@@ -84,4 +84,3 @@ export async function PATCH(
     return new NextResponse(message, { status: 500 });
   }
 }
-

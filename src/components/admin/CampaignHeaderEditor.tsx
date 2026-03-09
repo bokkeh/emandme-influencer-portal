@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Props = {
   campaignId: string;
@@ -16,6 +24,7 @@ type Props = {
   initialTotalBudget: string | null;
   initialStartDate: Date | string | null;
   initialEndDate: Date | string | null;
+  initialCampaignType: "influencer" | "ugc" | "affiliate";
 };
 
 const PLATFORMS: Array<"instagram" | "tiktok" | "youtube" | "pinterest" | "blog"> = [
@@ -41,6 +50,7 @@ export function CampaignHeaderEditor({
   initialTotalBudget,
   initialStartDate,
   initialEndDate,
+  initialCampaignType,
 }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -49,6 +59,7 @@ export function CampaignHeaderEditor({
   const [totalBudget, setTotalBudget] = useState(initialTotalBudget ?? "");
   const [startDate, setStartDate] = useState(toDateInput(initialStartDate));
   const [endDate, setEndDate] = useState(toDateInput(initialEndDate));
+  const [campaignType, setCampaignType] = useState<"influencer" | "ugc" | "affiliate">(initialCampaignType);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -69,6 +80,7 @@ export function CampaignHeaderEditor({
           totalBudget: totalBudget || null,
           startDate: startDate || null,
           endDate: endDate || null,
+          campaignType,
         }),
       });
       if (!res.ok) throw new Error((await res.text()) || "Failed to update campaign");
@@ -112,6 +124,19 @@ export function CampaignHeaderEditor({
           <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
+        <div className="max-w-[220px]">
+          <Label>Campaign Type</Label>
+          <Select value={campaignType} onValueChange={(value) => setCampaignType(value as "influencer" | "ugc" | "affiliate")}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="influencer">Influencer</SelectItem>
+              <SelectItem value="ugc">UGC</SelectItem>
+              <SelectItem value="affiliate">Affiliate</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="flex gap-2">
           <Button
             type="button"
@@ -132,6 +157,7 @@ export function CampaignHeaderEditor({
               setTotalBudget(initialTotalBudget ?? "");
               setStartDate(toDateInput(initialStartDate));
               setEndDate(toDateInput(initialEndDate));
+              setCampaignType(initialCampaignType);
               setEditing(false);
             }}
           >

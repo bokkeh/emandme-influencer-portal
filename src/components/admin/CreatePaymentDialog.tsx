@@ -116,6 +116,7 @@ export function CreatePaymentDialog({ influencers }: { influencers: Influencer[]
                 <SelectContent>
                   <SelectItem value="campaign_fee">Campaign Fee</SelectItem>
                   <SelectItem value="bonus">Bonus</SelectItem>
+                  <SelectItem value="affiliate_commission">Affiliate Commission</SelectItem>
                   <SelectItem value="gift_card">Gift Card</SelectItem>
                   <SelectItem value="product_credit">Product Credit</SelectItem>
                 </SelectContent>

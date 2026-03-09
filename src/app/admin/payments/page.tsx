@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { payments, influencerProfiles, users } from "@/lib/db/schema";
-import { eq, sum } from "drizzle-orm";
+import { payments, influencerProfiles, users, discountCodes } from "@/lib/db/schema";
+import { and, eq, sum } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { KPICard } from "@/components/admin/KPICard";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 
 export default async function PaymentsPage() {
-  const [allPayments, [pendingTotal], [paidTotal], [failedTotal], allInfluencers] = await Promise.all([
+  const [allPayments, [pendingTotal], [paidTotal], [failedTotal], [affiliatePending], [affiliatePaid], [affiliateRevenue], allInfluencers] = await Promise.all([
     db
       .select({
         id: payments.id,
@@ -44,6 +44,15 @@ export default async function PaymentsPage() {
     db.select({ total: sum(payments.amount) }).from(payments).where(eq(payments.status, "pending")),
     db.select({ total: sum(payments.amount) }).from(payments).where(eq(payments.status, "paid")),
     db.select({ total: sum(payments.amount) }).from(payments).where(eq(payments.status, "failed")),
+    db
+      .select({ total: sum(payments.amount) })
+      .from(payments)
+      .where(and(eq(payments.status, "pending"), eq(payments.paymentType, "affiliate_commission"))),
+    db
+      .select({ total: sum(payments.amount) })
+      .from(payments)
+      .where(and(eq(payments.status, "paid"), eq(payments.paymentType, "affiliate_commission"))),
+    db.select({ total: sum(discountCodes.revenueGenerated) }).from(discountCodes),
     db
       .select({
         id: influencerProfiles.id,
@@ -78,10 +87,13 @@ export default async function PaymentsPage() {
         <CreatePaymentDialog influencers={influencerOptions} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KPICard title="Pending Payouts" value={fmt(pendingTotal.total)} icon={CreditCard} iconColor="text-orange-600" iconBg="bg-orange-50" />
         <KPICard title="Total Paid" value={fmt(paidTotal.total)} icon={TrendingUp} iconColor="text-green-600" iconBg="bg-green-50" />
         <KPICard title="Failed" value={fmt(failedTotal.total)} icon={AlertCircle} iconColor="text-red-600" iconBg="bg-red-50" />
+        <KPICard title="Affiliate Pending" value={fmt(affiliatePending.total)} icon={CreditCard} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
+        <KPICard title="Affiliate Paid" value={fmt(affiliatePaid.total)} icon={TrendingUp} iconColor="text-emerald-600" iconBg="bg-emerald-50" />
+        <KPICard title="Affiliate Revenue" value={fmt(affiliateRevenue.total)} icon={TrendingUp} iconColor="text-violet-600" iconBg="bg-violet-50" />
       </div>
 
       <Card className="border border-gray-200 shadow-sm">
@@ -126,10 +138,10 @@ export default async function PaymentsPage() {
                       </TableCell>
                       <TableCell><StatusBadge status={p.status} /></TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {p.dueDate ? format(new Date(p.dueDate), "MMM d, yyyy") : "—"}
+                        {p.dueDate ? format(new Date(p.dueDate), "MMM d, yyyy") : "-"}
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {p.paidAt ? format(new Date(p.paidAt), "MMM d, yyyy") : "—"}
+                        {p.paidAt ? format(new Date(p.paidAt), "MMM d, yyyy") : "-"}
                       </TableCell>
                       <TableCell>
                         {p.status === "pending" ? (
@@ -147,7 +159,7 @@ export default async function PaymentsPage() {
                           )
                         ) : null}
                         {p.stripeTransferId ? (
-                          <span className="font-mono text-xs text-gray-400">{p.stripeTransferId.slice(0, 16)}…</span>
+                          <span className="font-mono text-xs text-gray-400">{p.stripeTransferId.slice(0, 16)}...</span>
                         ) : null}
                       </TableCell>
                     </TableRow>

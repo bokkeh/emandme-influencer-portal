@@ -42,6 +42,7 @@ export default async function InfluencerCampaignsPage() {
       campaignTitle: campaigns.title,
       campaignDescription: campaigns.description,
       campaignStatus: campaigns.status,
+      campaignType: campaigns.campaignType,
       campaignPlatforms: campaigns.platforms,
       startDate: campaigns.startDate,
       endDate: campaigns.endDate,
@@ -84,6 +85,11 @@ export default async function InfluencerCampaignsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900">{campaign.campaignTitle}</h3>
+                      <div className="mt-1">
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600">
+                          {campaign.campaignType}
+                        </span>
+                      </div>
                       {campaign.campaignDescription && (
                         <p className="mt-1 text-sm text-gray-500 line-clamp-2">{campaign.campaignDescription}</p>
                       )}

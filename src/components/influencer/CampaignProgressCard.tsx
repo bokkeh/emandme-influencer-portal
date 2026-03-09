@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NICHES } from "@/lib/constants/niches";
 import { formatPhoneDisplay, normalizePhoneE164 } from "@/lib/phone";
 
@@ -37,6 +38,7 @@ type CampaignProduct = {
 
 type Props = {
   campaignId: string;
+  campaignType: "influencer" | "ugc" | "affiliate";
   canSubmitPetInfo: boolean;
   profileComplete: boolean;
   checklist: ChecklistItem[];
@@ -66,6 +68,7 @@ type Props = {
 
 export function CampaignProgressCard({
   campaignId,
+  campaignType,
   canSubmitPetInfo,
   profileComplete,
   checklist,
@@ -95,12 +98,26 @@ export function CampaignProgressCard({
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>(
     defaultSelectedProductId ? [defaultSelectedProductId] : []
   );
+  const initialPersonalizationMap = (() => {
+    const map: Record<string, string> = {};
+    const raw = (initialPetInfo.tagPersonalizationText ?? "").trim();
+    if (!raw) return map;
+
+    for (const line of raw.split("\n")) {
+      const [rawTitle, ...rest] = line.split(":");
+      const title = rawTitle?.trim();
+      const text = rest.join(":").trim();
+      if (!title || !text) continue;
+      const matched = campaignProducts.find((p) => p.title.toLowerCase() === title.toLowerCase());
+      if (!matched) continue;
+      const key = matched.shopifyProductId || matched.title;
+      map[key] = text;
+    }
+
+    return map;
+  })();
   const [personalizationByProduct, setPersonalizationByProduct] = useState<Record<string, string>>(
-    defaultSelectedProductId
-      ? {
-          [defaultSelectedProductId]: initialPetInfo.tagPersonalizationText,
-        }
-      : {}
+    initialPersonalizationMap
   );
 
   const completed = checklist.filter((item) => item.done).length;
@@ -236,8 +253,16 @@ export function CampaignProgressCard({
           ))}
         </div>
 
-        <div className="space-y-4 rounded-md border border-gray-200 p-3">
-          <p className="text-sm font-semibold text-gray-900">Campaign Onboarding</p>
+        <Tabs defaultValue="step1" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="step1">Step 1</TabsTrigger>
+            <TabsTrigger value="step2">Step 2</TabsTrigger>
+            <TabsTrigger value="step3">Step 3</TabsTrigger>
+            <TabsTrigger value="step4">Step 4</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="step1" className="space-y-4 rounded-md border border-gray-200 p-3">
+            <p className="text-sm font-semibold text-gray-900">Campaign Onboarding</p>
           {!canSubmitPetInfo ? (
             <p className="text-xs text-amber-700">
               {profileComplete
@@ -411,7 +436,56 @@ export function CampaignProgressCard({
               {saving ? "Submitting..." : "Submit Order"}
             </Button>
           </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="step2" className="rounded-md border border-gray-200 p-4">
+            <p className="text-sm font-semibold text-gray-900">Upload Content</p>
+            <p className="mt-1 text-sm text-gray-600">
+              After your order is submitted, upload your draft assets for review.
+            </p>
+            <div className="mt-3">
+              <Button
+                type="button"
+                onClick={() => router.push(`/influencer/upload?campaignId=${campaignId}`)}
+                className="bg-rose-600 hover:bg-rose-700"
+              >
+                Go to Upload
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="step3" className="rounded-md border border-gray-200 p-4">
+            <p className="text-sm font-semibold text-gray-900">
+              {campaignType === "ugc" ? "Review / Approval" : "Post"}
+            </p>
+            {campaignType === "ugc" ? (
+              <p className="mt-1 text-sm text-gray-600">
+                Submit assets, collect revisions if needed, and wait for final approval.
+              </p>
+            ) : campaignType === "affiliate" ? (
+              <p className="mt-1 text-sm text-gray-600">
+                Publish with your UTM link and discount code. Payouts are tied to attributed sales.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-gray-600">
+                Publish content once approved and follow the campaign brief timeline.
+              </p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="step4" className="rounded-md border border-gray-200 p-4">
+            <p className="text-sm font-semibold text-gray-900">Payment</p>
+            {campaignType === "affiliate" ? (
+              <p className="mt-1 text-sm text-gray-600">
+                Affiliate payouts are calculated from attributed sales via your code and UTM links.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-gray-600">
+                Payment will be issued after required deliverables are approved.
+              </p>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

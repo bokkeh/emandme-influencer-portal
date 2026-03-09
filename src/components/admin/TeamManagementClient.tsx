@@ -20,7 +20,7 @@ type TeamMember = {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  role: "admin" | "influencer" | "ugc_creator";
+  role: "admin" | "influencer" | "ugc_creator" | "affiliate";
   isActive: boolean;
   createdAt: string;
 };
@@ -143,6 +143,7 @@ export function TeamManagementClient() {
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="influencer">Influencer</SelectItem>
                           <SelectItem value="ugc_creator">UGC Creator</SelectItem>
+                          <SelectItem value="affiliate">Affiliate</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -190,4 +191,3 @@ export function TeamManagementClient() {
     </Card>
   );
 }
-

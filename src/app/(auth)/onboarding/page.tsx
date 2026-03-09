@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, Megaphone } from "lucide-react";
+import { Camera, Megaphone, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function OnboardingPage() {
@@ -13,7 +13,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function selectRole(role: "influencer" | "ugc_creator") {
+  async function selectRole(role: "influencer" | "ugc_creator" | "affiliate") {
     setLoading(role);
     try {
       const res = await fetch("/api/onboarding", {
@@ -42,7 +42,7 @@ export default function OnboardingPage() {
           <h1 className="text-3xl font-bold text-gray-900">Welcome to Em & Me Studio</h1>
           <p className="mt-2 text-gray-600">How will you be working with us?</p>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Card
             className="cursor-pointer border-2 transition-all hover:border-rose-400 hover:shadow-lg"
             onClick={() => selectRole("influencer")}
@@ -87,6 +87,30 @@ export default function OnboardingPage() {
                 onClick={(e) => { e.stopPropagation(); selectRole("ugc_creator"); }}
               >
                 {loading === "ugc_creator" ? "Setting up..." : "I'm a UGC Creator"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer border-2 transition-all hover:border-indigo-400 hover:shadow-lg"
+            onClick={() => selectRole("affiliate")}
+          >
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100">
+                <Link2 className="h-7 w-7 text-indigo-600" />
+              </div>
+              <CardTitle>Affiliate</CardTitle>
+              <CardDescription>
+                I share links and discount codes, and earn based on attributed sales performance.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                disabled={loading !== null}
+                onClick={(e) => { e.stopPropagation(); selectRole("affiliate"); }}
+              >
+                {loading === "affiliate" ? "Setting up..." : "I'm an Affiliate"}
               </Button>
             </CardContent>
           </Card>
