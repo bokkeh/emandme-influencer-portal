@@ -162,6 +162,8 @@ export async function PATCH(
           personalizationText,
           imageUrl:
             String(item.imageUrl ?? "").trim() || selectedFromCampaign?.imageUrl || null,
+          imageUrls:
+            selectedFromCampaign?.imageUrls?.filter((url) => Boolean(String(url).trim())) ?? [],
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -186,6 +188,7 @@ export async function PATCH(
           body.selectedProductVariantId?.trim() || selectedProduct?.variantId || null,
         personalizationText: tagPersonalizationText,
         imageUrl: selectedProduct?.imageUrl || null,
+        imageUrls: selectedProduct?.imageUrls?.filter((url) => Boolean(String(url).trim())) ?? [],
       });
     }
     const firstSelectedProduct = normalizedSelectedProducts[0];
@@ -245,7 +248,7 @@ export async function PATCH(
       "Selected products and personalization:",
       ...normalizedSelectedProducts.map(
         (item, index) =>
-          `${index + 1}. ${item.selectedProductTitle} — ${item.personalizationText}`
+          `${index + 1}. ${item.selectedProductTitle} - ${item.personalizationText}`
       ),
       `Pet: ${petName} (${petBreed}, ${petAge})`,
       `Personality: ${petPersonality}`,
@@ -261,6 +264,8 @@ export async function PATCH(
             shopifyProductId: item.selectedProductId ?? undefined,
             variant: item.selectedProductVariantId ?? undefined,
             personalizationText: item.personalizationText,
+            imageUrl: item.imageUrl ?? undefined,
+            imageUrls: item.imageUrls,
           })),
           notes: orderNotes,
           updatedAt: new Date(),
@@ -277,6 +282,8 @@ export async function PATCH(
           shopifyProductId: item.selectedProductId ?? undefined,
           variant: item.selectedProductVariantId ?? undefined,
           personalizationText: item.personalizationText,
+          imageUrl: item.imageUrl ?? undefined,
+          imageUrls: item.imageUrls,
         })),
         notes: orderNotes,
       });

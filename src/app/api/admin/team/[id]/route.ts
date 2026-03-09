@@ -72,6 +72,7 @@ export async function PATCH(
         email: users.email,
         firstName: users.firstName,
         lastName: users.lastName,
+        avatarUrl: users.avatarUrl,
         role: users.role,
         isActive: users.isActive,
       });

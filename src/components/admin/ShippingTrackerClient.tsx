@@ -41,6 +41,8 @@ type ShipmentProduct = {
   name: string;
   qty: number;
   personalizationText?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
 };
 
 type ShipmentRow = {
@@ -87,6 +89,25 @@ function parseProductsInput(raw: string): ShipmentProduct[] {
       return { name, qty: Number.isFinite(qty) ? Math.round(qty) : 1 };
     })
     .filter((item) => item.name);
+}
+
+function getProductHero(products: ShipmentProduct[] | null) {
+  if (!products || products.length === 0) return null;
+  const firstWithImage = products.find(
+    (product) =>
+      Boolean(product.imageUrl?.trim()) ||
+      (Array.isArray(product.imageUrls) && product.imageUrls.some((url) => Boolean(url?.trim())))
+  );
+  if (!firstWithImage) return null;
+  const imageUrl =
+    firstWithImage.imageUrl?.trim() ||
+    firstWithImage.imageUrls?.find((url) => Boolean(url?.trim())) ||
+    null;
+  if (!imageUrl) return null;
+  return {
+    imageUrl,
+    name: firstWithImage.name,
+  };
 }
 
 export function ShippingTrackerClient({
@@ -339,16 +360,17 @@ export function ShippingTrackerClient({
               onChange={(e) => setSearch(e.target.value)}
             />
             <div className="overflow-x-auto">
-              <Table className="min-w-[1100px] table-fixed">
+              <Table className="min-w-[1200px] table-fixed">
                 <TableHeader>
                   <TableRow className="bg-gray-50">
+                    <TableHead className="w-[110px]">Product</TableHead>
                     <TableHead>Influencer</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Carrier</TableHead>
-                    <TableHead>Tracking</TableHead>
-                    <TableHead>Shipped</TableHead>
-                    <TableHead>Est. Delivery</TableHead>
+                    <TableHead className="w-[430px]">Products</TableHead>
+                    <TableHead className="w-[180px]">Status</TableHead>
+                    <TableHead className="w-[110px]">Carrier</TableHead>
+                    <TableHead className="w-[130px]">Tracking</TableHead>
+                    <TableHead className="w-[120px]">Shipped</TableHead>
+                    <TableHead className="w-[130px]">Est. Delivery</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -357,8 +379,24 @@ export function ShippingTrackerClient({
                       (s.influencerName ??
                         `${s.userFirstName ?? ""} ${s.userLastName ?? ""}`.trim()) ||
                       s.userEmail;
+                    const hero = getProductHero(s.products);
                     return (
                       <TableRow key={s.id}>
+                        <TableCell className="align-top">
+                          {hero ? (
+                            <div className="w-[80px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                              <img
+                                src={hero.imageUrl}
+                                alt={hero.name}
+                                className="h-[80px] w-[80px] object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-[80px] w-[80px] items-center justify-center rounded-lg border border-dashed border-gray-300 text-xs text-gray-400">
+                              No image
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Link
                             href={`/admin/influencers/${s.influencerId}`}
@@ -376,7 +414,7 @@ export function ShippingTrackerClient({
                                     {p.name} x{p.qty}
                                   </p>
                                   {p.personalizationText ? (
-                                    <p className="mt-0.5 whitespace-normal break-words text-xs leading-relaxed text-gray-500">
+                                    <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-gray-500">
                                       Personalization: {p.personalizationText}
                                     </p>
                                   ) : null}

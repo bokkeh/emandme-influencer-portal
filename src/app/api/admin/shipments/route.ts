@@ -8,6 +8,8 @@ type ShipmentProductInput = {
   qty: number;
   variant?: string;
   shopifyProductId?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
 };
 
 async function requireAdminApi() {
@@ -46,6 +48,14 @@ function normalizeProducts(value: unknown): ShipmentProductInput[] {
       }
       if (typeof raw.shopifyProductId === "string" && raw.shopifyProductId.trim()) {
         base.shopifyProductId = raw.shopifyProductId.trim();
+      }
+      if (typeof raw.imageUrl === "string" && raw.imageUrl.trim()) {
+        base.imageUrl = raw.imageUrl.trim();
+      }
+      if (Array.isArray(raw.imageUrls)) {
+        base.imageUrls = raw.imageUrls
+          .map((value) => (typeof value === "string" ? value.trim() : ""))
+          .filter(Boolean);
       }
       return base;
     })

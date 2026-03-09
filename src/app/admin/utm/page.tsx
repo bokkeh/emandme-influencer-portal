@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,14 @@ const CONTENT_TYPES: Record<string, string[]> = {
   blog: ["blog_post"],
 };
 
+type RosterEntry = {
+  id: string;
+  fullName: string;
+  handle: string | null;
+  platform: string;
+  niche: string | null;
+};
+
 export default function UTMGeneratorPage() {
   const [baseUrl, setBaseUrl] = useState("https://emandmestudio.com");
   const [handle, setHandle] = useState("");
@@ -26,7 +34,56 @@ export default function UTMGeneratorPage() {
   const [contentType, setContentType] = useState("");
   const [campaignSlug, setCampaignSlug] = useState("");
   const [generatedUrl, setGeneratedUrl] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [rosterEntries, setRosterEntries] = useState<RosterEntry[]>([]);
+  const [loadingRoster, setLoadingRoster] = useState(true);
+  const [rosterQuery, setRosterQuery] = useState("");
+  const [selectedRosterId, setSelectedRosterId] = useState("");
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/roster");
+        if (!res.ok) throw new Error((await res.text()) || "Failed to load roster");
+        const data = (await res.json()) as RosterEntry[];
+        setRosterEntries(data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load roster";
+        toast.error(message);
+      } finally {
+        setLoadingRoster(false);
+      }
+    })();
+  }, []);
+
+  const filteredRoster = useMemo(() => {
+    const q = rosterQuery.trim().toLowerCase();
+    if (!q) return rosterEntries;
+    return rosterEntries.filter((entry) =>
+      [entry.fullName, entry.handle ?? "", entry.niche ?? "", entry.platform]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [rosterEntries, rosterQuery]);
+
+  const selectedRoster = useMemo(
+    () => rosterEntries.find((entry) => entry.id === selectedRosterId) ?? null,
+    [rosterEntries, selectedRosterId]
+  );
+
+  function applyRosterInfluencer() {
+    if (!selectedRoster) {
+      toast.error("Select an influencer from roster first.");
+      return;
+    }
+    setHandle((selectedRoster.handle ?? "").replace(/^@+/, ""));
+    const nextPlatform = selectedRoster.platform?.toLowerCase();
+    if (PLATFORMS.includes(nextPlatform)) {
+      setPlatform(nextPlatform);
+      setContentType("");
+    }
+    toast.success(`Applied ${selectedRoster.fullName} to UTM form.`);
+  }
 
   function generate() {
     if (!baseUrl || !handle || !platform) {
@@ -60,6 +117,48 @@ export default function UTMGeneratorPage() {
         <p className="text-sm text-gray-500">Generate tracking links for influencer campaigns</p>
       </div>
 
+      <Card className="border border-rose-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-rose-600" />
+            Manual UTM Builder
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-600">
+            Manually enter handle, platform, and campaign details for one-off links.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Quick From Roster</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            value={rosterQuery}
+            onChange={(e) => setRosterQuery(e.target.value)}
+            placeholder="Search roster by name, handle, niche..."
+          />
+          <Select value={selectedRosterId} onValueChange={setSelectedRosterId} disabled={loadingRoster}>
+            <SelectTrigger>
+              <SelectValue placeholder={loadingRoster ? "Loading roster..." : "Select influencer"} />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredRoster.map((entry) => (
+                <SelectItem key={entry.id} value={entry.id}>
+                  {entry.fullName} {entry.handle ? `(${entry.handle})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" onClick={applyRosterInfluencer} className="w-full">
+            Use Selected Influencer
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -83,7 +182,7 @@ export default function UTMGeneratorPage() {
               <Input
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
-                placeholder="@influencer_name"
+                placeholder="influencer_name"
               />
             </div>
 

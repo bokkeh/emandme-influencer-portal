@@ -667,6 +667,8 @@ type ShipmentProduct = {
   qty: number;
   shopifyProductId?: string;
   personalizationText?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
 };
 
 type ShippingAddress = {

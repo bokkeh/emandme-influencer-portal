@@ -32,6 +32,7 @@ export async function GET() {
         email: users.email,
         firstName: users.firstName,
         lastName: users.lastName,
+        avatarUrl: users.avatarUrl,
         role: users.role,
         isActive: users.isActive,
         createdAt: users.createdAt,
@@ -45,4 +46,3 @@ export async function GET() {
     return new NextResponse(message, { status: 500 });
   }
 }
-

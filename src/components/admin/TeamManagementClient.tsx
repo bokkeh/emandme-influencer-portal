@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,7 @@ type TeamMember = {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  avatarUrl: string | null;
   role: "admin" | "influencer" | "ugc_creator" | "affiliate";
   isActive: boolean;
   createdAt: string;
@@ -28,6 +30,12 @@ type TeamMember = {
 function displayName(member: TeamMember) {
   const name = `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim();
   return name || member.email;
+}
+
+function initials(member: TeamMember) {
+  const fromName = `${member.firstName?.[0] ?? ""}${member.lastName?.[0] ?? ""}`.toUpperCase();
+  if (fromName) return fromName;
+  return member.email.slice(0, 2).toUpperCase();
 }
 
 export function TeamManagementClient() {
@@ -110,9 +118,17 @@ export function TeamManagementClient() {
                   key={member.id}
                   className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 md:flex-row md:items-center md:justify-between"
                 >
+                  <div className="flex items-center gap-3">
+                    <Avatar size="lg">
+                      {member.avatarUrl ? <AvatarImage src={member.avatarUrl} alt={displayName(member)} /> : null}
+                      <AvatarFallback>{initials(member)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{displayName(member)}</p>
+                      <p className="text-xs text-gray-500">{member.email}</p>
+                    </div>
+                  </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{displayName(member)}</p>
-                    <p className="text-xs text-gray-500">{member.email}</p>
                     <div className="mt-1 flex items-center gap-2">
                       <Badge className="bg-gray-100 text-gray-700">{member.role}</Badge>
                       {!member.isActive ? (
