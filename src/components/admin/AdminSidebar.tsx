@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { ViewModeToggle } from "@/components/shared/ViewModeToggle";
 
-const NAV_ITEMS = [
+export const ADMIN_NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Roster", href: "/admin/roster", icon: ClipboardList },
   { label: "Ad Library Scraper", href: "/admin/meta-ad-library", icon: Search },
@@ -50,7 +50,7 @@ export function AdminSidebar({ showViewToggle = false }: { showViewToggle?: bool
 
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-0.5 px-3">
-          {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+          {ADMIN_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
               <li key={href}>

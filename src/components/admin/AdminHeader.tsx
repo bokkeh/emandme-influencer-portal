@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 export function AdminHeader() {
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
+    <header className="hidden h-16 items-center justify-between border-b border-gray-200 bg-white px-6 md:flex">
       <div />
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="text-gray-500">
