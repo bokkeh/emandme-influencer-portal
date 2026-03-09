@@ -11,6 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AssetReviewActions } from "@/components/admin/AssetReviewActions";
+import { getSignedReadUrlFromPublicUrl } from "@/lib/storage";
 
 export default async function AssetsPage() {
   const allAssets = await db
@@ -36,14 +37,24 @@ export default async function AssetsPage() {
     .innerJoin(users, eq(influencerProfiles.userId, users.id))
     .orderBy(assets.createdAt);
 
+  const hydratedAssets = await Promise.all(
+    allAssets.map(async (asset) => ({
+      ...asset,
+      viewUrl: await getSignedReadUrlFromPublicUrl(asset.blobUrl),
+      viewThumbnailUrl: asset.thumbnailUrl
+        ? await getSignedReadUrlFromPublicUrl(asset.thumbnailUrl)
+        : null,
+    }))
+  );
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Asset Library</h1>
-        <p className="text-sm text-gray-500">{allAssets.length} total assets</p>
+        <p className="text-sm text-gray-500">{hydratedAssets.length} total assets</p>
       </div>
 
-      {allAssets.length === 0 ? (
+      {hydratedAssets.length === 0 ? (
         <EmptyState
           icon={ImageIcon}
           title="No assets yet"
@@ -51,7 +62,7 @@ export default async function AssetsPage() {
         />
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {allAssets.map((asset) => {
+          {hydratedAssets.map((asset) => {
             const name =
               (asset.influencerName ??
                 `${asset.userFirstName ?? ""} ${asset.userLastName ?? ""}`.trim()) ||
@@ -65,13 +76,13 @@ export default async function AssetsPage() {
                       controls
                       preload="metadata"
                       playsInline
-                      poster={asset.thumbnailUrl ?? undefined}
+                      poster={asset.viewThumbnailUrl ?? undefined}
                     >
-                      <source src={asset.blobUrl} />
+                      <source src={asset.viewUrl} />
                     </video>
-                  ) : asset.thumbnailUrl ? (
+                  ) : asset.viewThumbnailUrl ? (
                     <img
-                      src={asset.thumbnailUrl}
+                      src={asset.viewThumbnailUrl}
                       alt={asset.title ?? "Asset"}
                       className="h-full w-full object-cover"
                     />
@@ -107,7 +118,7 @@ export default async function AssetsPage() {
                       className="gap-2"
                     >
                       <a
-                      href={asset.blobUrl}
+                      href={asset.viewUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -115,7 +126,7 @@ export default async function AssetsPage() {
                       Open
                       </a>
                     </Button>
-                    <CopyButton text={asset.blobUrl} label="Copy link" />
+                    <CopyButton text={asset.viewUrl} label="Copy link" />
                   </div>
                   <AssetReviewActions
                     assetId={asset.id}

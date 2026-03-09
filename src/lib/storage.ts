@@ -76,6 +76,33 @@ function createStorageClient(config: NonNullable<ReturnType<typeof getGcsConfig>
   });
 }
 
+function getObjectPathFromGcsUrl(url: string, bucket: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname.replace(/^\/+/, "");
+
+    // https://storage.googleapis.com/<bucket>/<objectPath>
+    if (host === "storage.googleapis.com" && pathname.startsWith(`${bucket}/`)) {
+      return decodeURIComponent(pathname.slice(bucket.length + 1));
+    }
+
+    // https://<bucket>.storage.googleapis.com/<objectPath>
+    if (host === `${bucket}.storage.googleapis.com`) {
+      return decodeURIComponent(pathname);
+    }
+
+    // Custom public base URL prefix, e.g. https://cdn.example.com/gcs
+    const base = process.env.GCS_PUBLIC_BASE_URL?.trim();
+    if (base && url.startsWith(base.replace(/\/$/, "") + "/")) {
+      return decodeURIComponent(url.slice(base.replace(/\/$/, "").length + 1));
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 async function toBuffer(data: UploadInput): Promise<Buffer> {
   if (Buffer.isBuffer(data)) return data;
   if (data instanceof Uint8Array) return Buffer.from(data);
@@ -140,4 +167,20 @@ export async function uploadPublicFile(pathname: string, data: UploadInput, cont
     url: getPublicObjectUrl(config.bucket, objectPath),
     provider: "gcs" as const,
   };
+}
+
+export async function getSignedReadUrlFromPublicUrl(url: string, expiresInSeconds = 60 * 60) {
+  const config = getGcsConfig();
+  if (!config) return url;
+  const objectPath = getObjectPathFromGcsUrl(url, config.bucket);
+  if (!objectPath) return url;
+
+  const storage = createStorageClient(config);
+  const file = storage.bucket(config.bucket).file(objectPath);
+  const [signedUrl] = await file.getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + expiresInSeconds * 1000,
+  });
+  return signedUrl;
 }

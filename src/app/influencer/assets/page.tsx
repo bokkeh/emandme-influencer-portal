@@ -12,6 +12,7 @@ import { ImageIcon, Upload } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDeleteButton } from "@/components/influencer/AssetDeleteButton";
+import { getSignedReadUrlFromPublicUrl } from "@/lib/storage";
 
 export default async function InfluencerAssetsPage() {
   const { userId } = await auth();
@@ -29,7 +30,17 @@ export default async function InfluencerAssetsPage() {
     .where(eq(assets.influencerProfileId, profile.id))
     .orderBy(assets.createdAt);
 
-  const recentReviewedAssets = myAssets.filter((asset) => {
+  const hydratedAssets = await Promise.all(
+    myAssets.map(async (asset) => ({
+      ...asset,
+      viewUrl: await getSignedReadUrlFromPublicUrl(asset.blobUrl),
+      viewThumbnailUrl: asset.thumbnailUrl
+        ? await getSignedReadUrlFromPublicUrl(asset.thumbnailUrl)
+        : null,
+    }))
+  );
+
+  const recentReviewedAssets = hydratedAssets.filter((asset) => {
     if (!asset.reviewedAt) return false;
     const reviewedAt = new Date(asset.reviewedAt);
     return Date.now() - reviewedAt.getTime() <= 1000 * 60 * 60 * 24 * 14;
@@ -70,7 +81,7 @@ export default async function InfluencerAssetsPage() {
             </div>
           ) : null}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {myAssets.map((asset) => {
+            {hydratedAssets.map((asset) => {
             const metrics = (asset.metrics as Record<string, number>) ?? {};
             return (
               <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm">
@@ -81,12 +92,12 @@ export default async function InfluencerAssetsPage() {
                       controls
                       preload="metadata"
                       playsInline
-                      poster={asset.thumbnailUrl ?? undefined}
+                      poster={asset.viewThumbnailUrl ?? undefined}
                     >
-                      <source src={asset.blobUrl} />
+                      <source src={asset.viewUrl} />
                     </video>
-                  ) : asset.thumbnailUrl ? (
-                    <img src={asset.thumbnailUrl} alt={asset.title ?? "Asset"} className="h-full w-full object-cover" />
+                  ) : asset.viewThumbnailUrl ? (
+                    <img src={asset.viewThumbnailUrl} alt={asset.title ?? "Asset"} className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-xs text-gray-500">No preview</span>
                   )}
