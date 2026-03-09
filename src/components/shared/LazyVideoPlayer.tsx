@@ -23,7 +23,14 @@ export function LazyVideoPlayer({ src, poster, className }: Props) {
         {poster ? (
           <img src={poster} alt="Video preview" className="h-auto w-full" />
         ) : (
-          <div className="aspect-video w-full bg-black" />
+          <video
+            className="h-auto w-full bg-black"
+            muted
+            playsInline
+            preload="metadata"
+          >
+            <source src={src} />
+          </video>
         )}
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/65 px-3 py-1 text-xs font-medium text-white">
@@ -47,4 +54,3 @@ export function LazyVideoPlayer({ src, poster, className }: Props) {
     </video>
   );
 }
-
