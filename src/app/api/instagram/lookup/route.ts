@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { uploadPublicFile } from "@/lib/storage";
 import { db, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
@@ -127,27 +127,26 @@ export async function POST(req: Request) {
       if (bioMatch) bio = bioMatch[1].trim() || null;
     }
 
-    // Download avatar and persist to Vercel Blob so it doesn't expire
+    // Download avatar and persist to configured storage so it doesn't expire
     let avatarUrl: string | null = null;
-    if (ogImage && process.env.BLOB_READ_WRITE_TOKEN) {
+    if (ogImage) {
       try {
         const imgRes = await fetch(ogImage);
         if (imgRes.ok) {
           const imgBuffer = await imgRes.arrayBuffer();
           const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
           const ext = contentType.includes("png") ? "png" : "jpg";
-          const blob = await put(`avatars/instagram-${username}-${Date.now()}.${ext}`, imgBuffer, {
-            access: "public",
-            contentType,
-          });
-          avatarUrl = blob.url;
+          const uploaded = await uploadPublicFile(
+            `avatars/instagram-${username}-${Date.now()}.${ext}`,
+            imgBuffer,
+            contentType
+          );
+          avatarUrl = uploaded.url;
         }
       } catch {
-        // Blob upload failed — use the CDN URL directly as fallback
+        // Storage upload failed - use the CDN URL directly as fallback
         avatarUrl = ogImage;
       }
-    } else if (ogImage) {
-      avatarUrl = ogImage;
     }
 
     return NextResponse.json({

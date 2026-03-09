@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, appSettings, influencerProfiles, payments, taxDocuments, users } from "@/lib/db";
+import { uploadPublicFile } from "@/lib/storage";
 
 function escapeFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -236,10 +236,11 @@ export async function POST(req: Request) {
     const pdfBuffer = buildSimplePdf(pdfLines);
     const safeName = escapeFileName(profile.taxLegalName || name || profile.id);
     const filename = `1099-nec-${taxYear}-${safeName}.pdf`;
-    const blob = await put(`tax-documents/generated/${profile.id}/${taxYear}/${filename}`, pdfBuffer, {
-      access: "public",
-      contentType: "application/pdf",
-    });
+    const uploaded = await uploadPublicFile(
+      `tax-documents/generated/${profile.id}/${taxYear}/${filename}`,
+      pdfBuffer,
+      "application/pdf"
+    );
 
     await db
       .insert(taxDocuments)
@@ -247,7 +248,7 @@ export async function POST(req: Request) {
         influencerProfileId: profile.id,
         taxYear,
         documentType: "1099_nec",
-        fileUrl: blob.url,
+        fileUrl: uploaded.url,
         fileName: filename,
         uploadedByUserId: adminUser.id,
         updatedAt: new Date(),
@@ -255,14 +256,14 @@ export async function POST(req: Request) {
       .onConflictDoUpdate({
         target: [taxDocuments.influencerProfileId, taxDocuments.taxYear, taxDocuments.documentType],
         set: {
-          fileUrl: blob.url,
+          fileUrl: uploaded.url,
           fileName: filename,
           uploadedByUserId: adminUser.id,
           updatedAt: new Date(),
         },
       });
 
-    generated.push({ influencerProfileId: profile.id, name, total: totalPaid, fileUrl: blob.url });
+    generated.push({ influencerProfileId: profile.id, name, total: totalPaid, fileUrl: uploaded.url });
   }
 
   return NextResponse.json({

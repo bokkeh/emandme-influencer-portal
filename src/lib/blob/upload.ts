@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { uploadPublicFile } from "@/lib/storage";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
@@ -31,12 +31,9 @@ export async function uploadAsset(
   const ext = file.name.split(".").pop() ?? "bin";
   const pathname = `assets/${influencerProfileId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
-  const blob = await put(pathname, file, {
-    access: "public",
-    contentType: file.type,
-  });
+  const uploaded = await uploadPublicFile(pathname, file, file.type);
 
   const fileSizeMb = file.size / (1024 * 1024);
 
-  return { url: blob.url, fileType, fileSizeMb };
+  return { url: uploaded.url, fileType, fileSizeMb };
 }

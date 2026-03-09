@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/lib/db";
+import { uploadPublicFile } from "@/lib/storage";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
@@ -41,13 +41,10 @@ export async function POST(req: Request) {
 
     const ext = file.name.split(".").pop() ?? "bin";
     const pathname = `campaign-library/${guard.userId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-    const blob = await put(pathname, file, {
-      access: "public",
-      contentType: file.type,
-    });
+    const uploaded = await uploadPublicFile(pathname, file, file.type);
 
     return NextResponse.json({
-      url: blob.url,
+      url: uploaded.url,
       fileType: isImage ? "image" : "video",
       name: file.name,
     });
@@ -56,4 +53,3 @@ export async function POST(req: Request) {
     return new NextResponse(message, { status: 500 });
   }
 }
-

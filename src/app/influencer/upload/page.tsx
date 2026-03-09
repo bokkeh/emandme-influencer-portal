@@ -25,6 +25,24 @@ const CONTENT_TYPES: Record<string, string[]> = {
 type UploadState = "idle" | "uploading" | "saving" | "done" | "error";
 const MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_FILE_MB ?? "4096");
 
+function uploadViaSignedUrl(uploadUrl: string, file: File, onProgress: (pct: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(file);
+  });
+}
+
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [platform, setPlatform] = useState("");
@@ -65,19 +83,36 @@ export default function UploadPage() {
     try {
       const contextRes = await fetch("/api/upload", { cache: "no-store" });
       if (!contextRes.ok) throw new Error(await contextRes.text());
-      const context = (await contextRes.json()) as { influencerProfileId: string };
+      const context = (await contextRes.json()) as { influencerProfileId: string; provider?: "gcs" | "blob" };
 
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const pathname = `assets/${context.influencerProfileId}/${Date.now()}-${safeName}`;
+      let uploadedUrl = "";
 
-      const blob = await upload(pathname, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        onUploadProgress: (event) => {
-          const next = Math.min(60, Math.max(15, Math.round(event.percentage * 0.6)));
+      if (context.provider === "gcs") {
+        const signedRes = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pathname, contentType: file.type }),
+        });
+        if (!signedRes.ok) throw new Error(await signedRes.text());
+        const signed = (await signedRes.json()) as { uploadUrl: string; publicUrl: string };
+        await uploadViaSignedUrl(signed.uploadUrl, file, (pct) => {
+          const next = Math.min(60, Math.max(15, Math.round(pct * 0.6)));
           setProgress(next);
-        },
-      });
+        });
+        uploadedUrl = signed.publicUrl;
+      } else {
+        const blob = await upload(pathname, file, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+          onUploadProgress: (event) => {
+            const next = Math.min(60, Math.max(15, Math.round(event.percentage * 0.6)));
+            setProgress(next);
+          },
+        });
+        uploadedUrl = blob.url;
+      }
 
       const fileType = file.type.startsWith("image/") ? "image" : "video";
       const fileSizeMb = file.size / (1024 * 1024);
@@ -90,7 +125,7 @@ export default function UploadPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           influencerProfileId: context.influencerProfileId,
-          blobUrl: blob.url,
+          blobUrl: uploadedUrl,
           fileType,
           fileSizeMb,
           platform,

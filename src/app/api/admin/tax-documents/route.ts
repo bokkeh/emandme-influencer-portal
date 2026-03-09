@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { desc, eq } from "drizzle-orm";
 import { db, influencerProfiles, taxDocuments, users } from "@/lib/db";
+import { uploadPublicFile } from "@/lib/storage";
 
 async function requireAdminApi() {
   const { userId, sessionClaims } = await auth();
@@ -82,10 +82,7 @@ export async function POST(req: Request) {
 
   const ext = file.name.split(".").pop() ?? "pdf";
   const pathname = `tax-documents/${influencerProfileId}/${taxYear}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-  const blob = await put(pathname, file, {
-    access: "public",
-    contentType: file.type || "application/pdf",
-  });
+  const uploaded = await uploadPublicFile(pathname, file, file.type || "application/pdf");
 
   const [saved] = await db
     .insert(taxDocuments)
@@ -93,7 +90,7 @@ export async function POST(req: Request) {
       influencerProfileId,
       taxYear,
       documentType,
-      fileUrl: blob.url,
+      fileUrl: uploaded.url,
       fileName: file.name,
       uploadedByUserId: adminUser.id,
       updatedAt: new Date(),
@@ -101,7 +98,7 @@ export async function POST(req: Request) {
     .onConflictDoUpdate({
       target: [taxDocuments.influencerProfileId, taxDocuments.taxYear, taxDocuments.documentType],
       set: {
-        fileUrl: blob.url,
+        fileUrl: uploaded.url,
         fileName: file.name,
         uploadedByUserId: adminUser.id,
         updatedAt: new Date(),

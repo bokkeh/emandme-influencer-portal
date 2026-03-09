@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db, users, influencerProfiles } from "@/lib/db";
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_FILE_MB } from "@/lib/blob/upload";
+import { createSignedUploadUrl, isGcsConfigured } from "@/lib/storage";
 
 async function resolveInfluencerProfileId(clerkUserId: string) {
   const [user] = await db
@@ -28,23 +29,55 @@ export async function GET() {
   const influencerProfileId = await resolveInfluencerProfileId(userId);
   if (!influencerProfileId) return new NextResponse("Profile not found", { status: 404 });
 
-  return NextResponse.json({ influencerProfileId, maxUploadMb: MAX_UPLOAD_FILE_MB });
+  return NextResponse.json({
+    influencerProfileId,
+    maxUploadMb: MAX_UPLOAD_FILE_MB,
+    provider: isGcsConfigured() ? "gcs" : "blob",
+  });
 }
 
-export async function POST(req: Request) {
-  const body = (await req.json()) as HandleUploadBody;
+type SignedUploadRequest = {
+  pathname?: string;
+  contentType?: string;
+};
 
+export async function POST(req: Request) {
   try {
+    const { userId } = await auth();
+    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+
+    const influencerProfileId = await resolveInfluencerProfileId(userId);
+    if (!influencerProfileId) return new NextResponse("Profile not found", { status: 404 });
+
+    if (isGcsConfigured()) {
+      const body = (await req.json()) as SignedUploadRequest;
+      const pathname = String(body.pathname ?? "");
+      const contentType = String(body.contentType ?? "").toLowerCase();
+
+      if (!pathname.startsWith(`assets/${influencerProfileId}/`)) {
+        return new NextResponse("Invalid upload path", { status: 400 });
+      }
+      if (!ALLOWED_UPLOAD_TYPES.includes(contentType)) {
+        return new NextResponse("Unsupported content type", { status: 400 });
+      }
+
+      const signed = await createSignedUploadUrl(pathname, contentType);
+      if (signed.provider !== "gcs") {
+        return new NextResponse("GCS is not configured", { status: 500 });
+      }
+
+      return NextResponse.json({
+        provider: "gcs",
+        uploadUrl: signed.uploadUrl,
+        publicUrl: signed.publicUrl,
+      });
+    }
+
+    const body = (await req.json()) as HandleUploadBody;
     const jsonResponse = await handleUpload({
       body,
       request: req,
       onBeforeGenerateToken: async (pathname) => {
-        const { userId } = await auth();
-        if (!userId) throw new Error("Unauthorized");
-
-        const influencerProfileId = await resolveInfluencerProfileId(userId);
-        if (!influencerProfileId) throw new Error("Profile not found");
-
         const allowedPrefix = `assets/${influencerProfileId}/`;
         if (!pathname.startsWith(allowedPrefix)) {
           throw new Error("Invalid upload path");
@@ -68,4 +101,3 @@ export async function POST(req: Request) {
     return new NextResponse(message, { status: 400 });
   }
 }
-

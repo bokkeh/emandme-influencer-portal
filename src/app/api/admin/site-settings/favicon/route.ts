@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { db, appSettings, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { uploadPublicFile } from "@/lib/storage";
 
 async function requireAdminApi() {
   const { userId, sessionClaims } = await auth();
@@ -33,13 +33,15 @@ function isSchemaError(error: unknown) {
   );
 }
 
-function isBlobConfigError(error: unknown) {
+function isStorageConfigError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const lowered = message.toLowerCase();
   return (
     lowered.includes("blob_read_write_token") ||
     lowered.includes("read-write token") ||
-    lowered.includes("vercel blob")
+    lowered.includes("vercel blob") ||
+    lowered.includes("gcs_") ||
+    lowered.includes("google cloud")
   );
 }
 
@@ -76,33 +78,26 @@ export async function POST(req: Request) {
     if (file.size > 1024 * 1024) {
       return new NextResponse("Favicon file must be <= 1MB", { status: 400 });
     }
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return new NextResponse(
-        "Missing BLOB_READ_WRITE_TOKEN in Vercel environment variables.",
-        { status: 500 }
-      );
-    }
-
     const ext = file.name.split(".").pop()?.toLowerCase() || "ico";
     const pathname = `settings/favicon-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-    const blob = await put(pathname, file, { access: "public", contentType: file.type });
+    const uploaded = await uploadPublicFile(pathname, file, file.type);
 
     await db
       .insert(appSettings)
       .values({
         key: "favicon_url",
-        value: blob.url,
+        value: uploaded.url,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: appSettings.key,
         set: {
-          value: blob.url,
+          value: uploaded.url,
           updatedAt: new Date(),
         },
       });
 
-    return NextResponse.json({ faviconUrl: blob.url });
+    return NextResponse.json({ faviconUrl: uploaded.url });
   } catch (error) {
     if (isSchemaError(error)) {
       return new NextResponse(
@@ -110,9 +105,9 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-    if (isBlobConfigError(error)) {
+    if (isStorageConfigError(error)) {
       return new NextResponse(
-        "Vercel Blob is not configured. Set BLOB_READ_WRITE_TOKEN in Production env and redeploy.",
+        "Storage is not configured. Set either GCS_* env vars or BLOB_READ_WRITE_TOKEN and redeploy.",
         { status: 500 }
       );
     }

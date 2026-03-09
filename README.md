@@ -5,7 +5,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
-npm run dev
+2
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -18,7 +18,7 @@ Use this when you are ready to move media uploads into a GCS bucket.
 2. Create a service account with `Storage Object Admin` on that bucket only.
 3. Do not commit service account JSON keys to git.
 4. Store credentials in env vars instead:
-   - `GCS_PROJECT_ID`
+   - `GCS_PROJECT_ID` 
    - `GCS_BUCKET`
    - `GCS_CLIENT_EMAIL`
    - `GCS_PRIVATE_KEY` (multi-line key with `\n` escaped in env)
