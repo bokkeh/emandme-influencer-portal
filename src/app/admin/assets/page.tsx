@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AssetReviewActions } from "@/components/admin/AssetReviewActions";
 import { getSignedReadUrlFromPublicUrl } from "@/lib/storage";
+import { LazyVideoPlayer } from "@/components/shared/LazyVideoPlayer";
 
 export default async function AssetsPage() {
   const allAssets = await db
@@ -71,15 +72,10 @@ export default async function AssetsPage() {
               <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm transition-shadow hover:shadow-md">
                 <div className={`relative flex items-center justify-center bg-gray-100 ${asset.fileType === "video" ? "p-1" : "h-40"}`}>
                   {asset.fileType === "video" ? (
-                    <video
-                      className="h-auto w-full rounded bg-black"
-                      controls
-                      preload="metadata"
-                      playsInline
+                    <LazyVideoPlayer
+                      src={asset.viewUrl}
                       poster={asset.viewThumbnailUrl ?? undefined}
-                    >
-                      <source src={asset.viewUrl} />
-                    </video>
+                    />
                   ) : asset.viewThumbnailUrl ? (
                     <img
                       src={asset.viewThumbnailUrl}

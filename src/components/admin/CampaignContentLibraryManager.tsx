@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/shared/CopyButton";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { LazyVideoPlayer } from "@/components/shared/LazyVideoPlayer";
 
 type CampaignProduct = {
   shopifyProductId: string;
@@ -146,15 +147,7 @@ export function CampaignContentLibraryManager({
                 <div key={asset.id} className="rounded-md border border-gray-200 p-2">
                   {asset.fileType === "video" ? (
                     <div className="flex items-center justify-center rounded bg-black p-1">
-                      <video
-                        className="h-auto w-full rounded"
-                        controls
-                        preload="metadata"
-                        playsInline
-                        poster={asset.thumbnailUrl ?? undefined}
-                      >
-                        <source src={asset.blobUrl} />
-                      </video>
+                      <LazyVideoPlayer src={asset.blobUrl} poster={asset.thumbnailUrl ?? undefined} />
                     </div>
                   ) : asset.thumbnailUrl ? (
                     <img src={asset.thumbnailUrl} alt={asset.title ?? "Asset"} className="h-28 w-full rounded object-cover" />
@@ -202,9 +195,7 @@ export function CampaignContentLibraryManager({
                 <div key={`${item.url}-${index}`} className="rounded border border-gray-200 bg-gray-50 p-2 text-sm">
                   {item.fileType === "video" ? (
                     <div className="flex items-center justify-center rounded bg-black p-1">
-                      <video className="h-auto w-full rounded" controls preload="metadata" playsInline>
-                        <source src={item.url} />
-                      </video>
+                      <LazyVideoPlayer src={item.url} />
                     </div>
                   ) : (
                     <img src={item.url} alt={item.name ?? "Uploaded media"} className="h-28 w-full rounded object-cover" />

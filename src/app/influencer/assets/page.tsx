@@ -13,6 +13,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { AssetDeleteButton } from "@/components/influencer/AssetDeleteButton";
 import { getSignedReadUrlFromPublicUrl } from "@/lib/storage";
+import { LazyVideoPlayer } from "@/components/shared/LazyVideoPlayer";
 
 export default async function InfluencerAssetsPage() {
   const { userId } = await auth();
@@ -87,15 +88,10 @@ export default async function InfluencerAssetsPage() {
               <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm">
                 <div className={`relative flex items-center justify-center bg-gray-100 ${asset.fileType === "video" ? "p-1" : "h-40"}`}>
                   {asset.fileType === "video" ? (
-                    <video
-                      className="h-auto w-full rounded bg-black"
-                      controls
-                      preload="metadata"
-                      playsInline
+                    <LazyVideoPlayer
+                      src={asset.viewUrl}
                       poster={asset.viewThumbnailUrl ?? undefined}
-                    >
-                      <source src={asset.viewUrl} />
-                    </video>
+                    />
                   ) : asset.viewThumbnailUrl ? (
                     <img src={asset.viewThumbnailUrl} alt={asset.title ?? "Asset"} className="h-full w-full object-cover" />
                   ) : (
