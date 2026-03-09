@@ -16,6 +16,13 @@ export function AssetReviewActions({ assetId, currentStatus, initialReviewNotes 
   const router = useRouter();
   const [reviewNotes, setReviewNotes] = useState(initialReviewNotes ?? "");
   const [submittingStatus, setSubmittingStatus] = useState<string | null>(null);
+  const [emailDebug, setEmailDebug] = useState<{
+    status: "sent" | "failed";
+    recipientEmail?: string;
+    contactId?: string;
+    properties?: Record<string, string>;
+    error?: string | null;
+  } | null>(null);
 
   async function update(status: "approved" | "rejected" | "revision_requested") {
     setSubmittingStatus(status);
@@ -29,15 +36,34 @@ export function AssetReviewActions({ assetId, currentStatus, initialReviewNotes 
         const message = (await res.text()) || "Failed to update asset review";
         throw new Error(message);
       }
-      const data = (await res.json()) as { emailSent?: boolean; emailError?: string | null };
+      const data = (await res.json()) as {
+        emailSent?: boolean;
+        emailError?: string | null;
+        emailDebug?: {
+          recipientEmail?: string;
+          contactId?: string;
+          properties?: Record<string, string>;
+        } | null;
+      };
       toast.success(`Asset ${status.replace("_", " ")}.`);
       if (data.emailSent === false) {
         toast.warning(data.emailError ?? "HubSpot email did not send.");
       }
+      setEmailDebug({
+        status: data.emailSent === false ? "failed" : "sent",
+        recipientEmail: data.emailDebug?.recipientEmail,
+        contactId: data.emailDebug?.contactId,
+        properties: data.emailDebug?.properties,
+        error: data.emailError ?? null,
+      });
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update asset review";
       toast.error(message);
+      setEmailDebug({
+        status: "failed",
+        error: message,
+      });
     } finally {
       setSubmittingStatus(null);
     }
@@ -86,6 +112,27 @@ export function AssetReviewActions({ assetId, currentStatus, initialReviewNotes 
       </div>
       {currentStatus !== "pending_review" ? (
         <p className="text-[11px] text-gray-500">Current status: {currentStatus.replace("_", " ")}</p>
+      ) : null}
+      {emailDebug ? (
+        <div className="rounded border border-gray-200 bg-white p-2">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Email Debug</p>
+          <p className="mt-1 text-[11px] text-gray-700">
+            Status:{" "}
+            <span className={emailDebug.status === "sent" ? "text-green-700" : "text-red-700"}>
+              {emailDebug.status}
+            </span>
+          </p>
+          <p className="text-[11px] text-gray-700">Recipient: {emailDebug.recipientEmail ?? "-"}</p>
+          <p className="text-[11px] text-gray-700">HubSpot Contact ID: {emailDebug.contactId ?? "-"}</p>
+          {emailDebug.error ? (
+            <p className="mt-1 text-[11px] text-red-700">Error: {emailDebug.error}</p>
+          ) : null}
+          {emailDebug.properties ? (
+            <pre className="mt-2 max-h-36 overflow-auto rounded bg-gray-50 p-2 text-[10px] text-gray-700">
+              {JSON.stringify(emailDebug.properties, null, 2)}
+            </pre>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

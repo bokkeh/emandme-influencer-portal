@@ -168,5 +168,12 @@ export async function sendAssetReviewEmailViaHubSpot({
     .where(eq(influencerProfiles.id, influencerProfileId));
 
   // "sent" here means workflow trigger payload was successfully pushed to HubSpot.
-  return { sent: true as const };
+  return {
+    sent: true as const,
+    debug: {
+      recipientEmail: profile.userEmail,
+      contactId,
+      properties,
+    },
+  };
 }

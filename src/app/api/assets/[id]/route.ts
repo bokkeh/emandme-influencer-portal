@@ -60,6 +60,11 @@ export async function PATCH(
 
   let emailSent = false;
   let emailError: string | null = null;
+  let emailDebug: {
+    recipientEmail?: string;
+    contactId?: string;
+    properties?: Record<string, string>;
+  } | null = null;
   try {
     const emailResult = await sendAssetReviewEmailViaHubSpot({
       influencerProfileId: existing.influencerProfileId,
@@ -69,6 +74,7 @@ export async function PATCH(
       reviewNotes: body.reviewNotes ?? null,
     });
     emailSent = emailResult.sent;
+    emailDebug = emailResult.sent ? emailResult.debug : null;
     if (!emailResult.sent) {
       emailError = "HubSpot workflow trigger skipped (missing influencer email).";
     }
@@ -85,7 +91,7 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ ...updated, emailSent, emailError });
+  return NextResponse.json({ ...updated, emailSent, emailError, emailDebug });
 }
 
 export async function DELETE(
