@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import {
   users,
   influencerProfiles,
+  socialAccounts,
   campaignInfluencers,
   campaigns,
   utmLinks,
@@ -68,11 +69,22 @@ export default async function InfluencerCampaignDetailPage({
 
   if (!profile) redirect("/onboarding");
 
+  const existingSocials = await db
+    .select({
+      platform: socialAccounts.platform,
+      profileUrl: socialAccounts.profileUrl,
+    })
+    .from(socialAccounts)
+    .where(eq(socialAccounts.influencerProfileId, profile.id));
+
+  const socialByPlatform = new Map(existingSocials.map((item) => [item.platform, item.profileUrl ?? ""]));
+
   const [enrollment] = await db
     .select({
       id: campaignInfluencers.id,
       status: campaignInfluencers.status,
       agreedFee: campaignInfluencers.agreedFee,
+      includesFreeProduct: campaignInfluencers.includesFreeProduct,
       contentDueDate: campaignInfluencers.contentDueDate,
       deliverables: campaignInfluencers.deliverables,
       utmLinkId: campaignInfluencers.utmLinkId,
@@ -220,12 +232,28 @@ export default async function InfluencerCampaignDetailPage({
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-            {enrollment.agreedFee && (
-              <div>
-                <p className="text-xs font-medium text-gray-400">YOUR PAY</p>
-                <p className="text-lg font-bold text-gray-900">${Number(enrollment.agreedFee).toFixed(2)}</p>
-              </div>
-            )}
+            {(() => {
+              const payAmount = Number(enrollment.agreedFee ?? 0);
+              const hasCashPay = Boolean(enrollment.agreedFee) && !Number.isNaN(payAmount) && payAmount > 0;
+              if (!hasCashPay && !enrollment.includesFreeProduct) return null;
+              return (
+                <div>
+                  <p className="text-xs font-medium text-gray-400">YOUR PAY</p>
+                  {hasCashPay ? (
+                    <>
+                      <p className="text-lg font-bold text-gray-900">${payAmount.toFixed(2)}</p>
+                      {enrollment.includesFreeProduct ? (
+                        <p className="text-xs font-semibold text-emerald-700">+ Free Product</p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      Free Product
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
             {enrollment.contentDueDate && (
               <div>
                 <p className="text-xs font-medium text-gray-400">CONTENT DUE</p>
@@ -381,6 +409,10 @@ export default async function InfluencerCampaignDetailPage({
           displayName: profile.displayName ?? "",
           phone: profile.phone ?? "",
           niche: profile.niche ?? "",
+          instagramUrl: socialByPlatform.get("instagram") ?? "",
+          tiktokUrl: socialByPlatform.get("tiktok") ?? "",
+          youtubeUrl: socialByPlatform.get("youtube") ?? "",
+          pinterestUrl: socialByPlatform.get("pinterest") ?? "",
           shippingAddressLine1: profile.shippingAddressLine1 ?? "",
           shippingAddressLine2: profile.shippingAddressLine2 ?? "",
           shippingCity: profile.shippingCity ?? "",

@@ -442,6 +442,7 @@ export const campaignInfluencers = pgTable(
     contractStatus: varchar("contract_status", { length: 30 }).notNull().default("not_sent"),
     proposedFee: decimal("proposed_fee", { precision: 12, scale: 2 }),
     agreedFee: decimal("agreed_fee", { precision: 12, scale: 2 }),
+    includesFreeProduct: boolean("includes_free_product").notNull().default(false),
     contentDueDate: timestamp("content_due_date", { withTimezone: true }),
     contractUrl: text("contract_url"),
     contractSentAt: timestamp("contract_sent_at", { withTimezone: true }),

@@ -36,6 +36,7 @@ export default async function InfluencerCampaignsPage() {
       enrollmentId: campaignInfluencers.id,
       status: campaignInfluencers.status,
       agreedFee: campaignInfluencers.agreedFee,
+      includesFreeProduct: campaignInfluencers.includesFreeProduct,
       contentDueDate: campaignInfluencers.contentDueDate,
       enrolledAt: campaignInfluencers.enrolledAt,
       campaignId: campaigns.id,
@@ -112,12 +113,29 @@ export default async function InfluencerCampaignsPage() {
                     <StatusBadge status={campaign.status} />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-6 text-sm">
-                    {campaign.agreedFee && (
-                      <div>
-                        <p className="text-xs text-gray-400 font-medium">YOUR PAY</p>
-                        <p className="font-semibold text-gray-900">${Number(campaign.agreedFee).toFixed(2)}</p>
-                      </div>
-                    )}
+                    {(() => {
+                      const payAmount = Number(campaign.agreedFee ?? 0);
+                      const hasCashPay =
+                        Boolean(campaign.agreedFee) && !Number.isNaN(payAmount) && payAmount > 0;
+                      if (!hasCashPay && !campaign.includesFreeProduct) return null;
+                      return (
+                        <div>
+                          <p className="text-xs text-gray-400 font-medium">YOUR PAY</p>
+                          {hasCashPay ? (
+                            <>
+                              <p className="font-semibold text-gray-900">${payAmount.toFixed(2)}</p>
+                              {campaign.includesFreeProduct ? (
+                                <p className="text-xs font-semibold text-emerald-700">+ Free Product</p>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              Free Product
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {campaign.contentDueDate && (
                       <div>
                         <p className="text-xs text-gray-400 font-medium">CONTENT DUE</p>

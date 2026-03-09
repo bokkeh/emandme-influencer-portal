@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TierBadge } from "@/components/shared/TierBadge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type EnrollmentRow = {
   id: string;
@@ -13,6 +14,7 @@ type EnrollmentRow = {
   contractStatus: string | null;
   proposedFee: string | null;
   agreedFee: string | null;
+  includesFreeProduct: boolean;
   contractUrl: string | null;
   contentDueDate: string | Date | null;
   influencerId: string;
@@ -127,6 +129,7 @@ export function CampaignEnrollmentPipelineTable({
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Contract</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Proposed</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Agreed</th>
+          <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Free Product</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Content Due</th>
           <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Tier</th>
         </tr>
@@ -193,6 +196,16 @@ export function CampaignEnrollmentPipelineTable({
                   placeholder="$"
                   onBlur={(ev) => void patchEnrollment(e.id, { proposedFee: ev.target.value || null })}
                 />
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={Boolean(e.includesFreeProduct)}
+                    onCheckedChange={(checked) =>
+                      void patchEnrollment(e.id, { includesFreeProduct: Boolean(checked) })
+                    }
+                  />
+                </div>
               </td>
               <td className="px-4 py-3">
                 <Input

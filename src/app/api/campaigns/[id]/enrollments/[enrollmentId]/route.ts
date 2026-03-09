@@ -32,6 +32,7 @@ export async function PATCH(
       contractStatus?: string;
       proposedFee?: number | string | null;
       agreedFee?: number | string | null;
+      includesFreeProduct?: boolean;
       contentDueDate?: string | null;
       contractUrl?: string | null;
       contractSentAt?: string | null;
@@ -82,6 +83,8 @@ export async function PATCH(
               ? String(body.agreedFee)
               : null
             : undefined,
+        includesFreeProduct:
+          body.includesFreeProduct !== undefined ? Boolean(body.includesFreeProduct) : undefined,
         contentDueDate:
           body.contentDueDate !== undefined ? (body.contentDueDate ? new Date(body.contentDueDate) : null) : undefined,
         contractUrl: body.contractUrl !== undefined ? (body.contractUrl?.trim() || null) : undefined,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Check, CheckCircle2, Circle } from "lucide-react";
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, Circle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,10 @@ type Props = {
     displayName: string;
     phone: string;
     niche: string;
+    instagramUrl?: string;
+    tiktokUrl?: string;
+    youtubeUrl?: string;
+    pinterestUrl?: string;
     shippingAddressLine1: string;
     shippingAddressLine2: string;
     shippingCity: string;
@@ -82,6 +86,10 @@ export function CampaignProgressCard({
   const [displayName, setDisplayName] = useState(initialProfileInfo.displayName);
   const [phone, setPhone] = useState(formatPhoneDisplay(initialProfileInfo.phone));
   const [niche, setNiche] = useState(initialProfileInfo.niche);
+  const [instagramUrl, setInstagramUrl] = useState(initialProfileInfo.instagramUrl ?? "");
+  const [tiktokUrl, setTiktokUrl] = useState(initialProfileInfo.tiktokUrl ?? "");
+  const [youtubeUrl, setYoutubeUrl] = useState(initialProfileInfo.youtubeUrl ?? "");
+  const [pinterestUrl, setPinterestUrl] = useState(initialProfileInfo.pinterestUrl ?? "");
   const [shippingAddressLine1, setShippingAddressLine1] = useState(initialProfileInfo.shippingAddressLine1);
   const [shippingAddressLine2, setShippingAddressLine2] = useState(initialProfileInfo.shippingAddressLine2);
   const [shippingCity, setShippingCity] = useState(initialProfileInfo.shippingCity);
@@ -119,6 +127,7 @@ export function CampaignProgressCard({
   const [personalizationByProduct, setPersonalizationByProduct] = useState<Record<string, string>>(
     initialPersonalizationMap
   );
+  const [carouselIndexByProduct, setCarouselIndexByProduct] = useState<Record<string, number>>({});
 
   const completed = checklist.filter((item) => item.done).length;
   const percent = Math.round((completed / checklist.length) * 100);
@@ -131,6 +140,17 @@ export function CampaignProgressCard({
     setSelectedProductIds((prev) =>
       prev.includes(id) ? prev.filter((current) => current !== id) : [...prev, id]
     );
+  }
+
+  function moveCarousel(productId: string, totalImages: number, direction: "prev" | "next") {
+    setCarouselIndexByProduct((prev) => {
+      const current = prev[productId] ?? 0;
+      const next =
+        direction === "next"
+          ? (current + 1) % totalImages
+          : (current - 1 + totalImages) % totalImages;
+      return { ...prev, [productId]: next };
+    });
   }
 
   async function submitCampaignOnboarding() {
@@ -177,6 +197,12 @@ export function CampaignProgressCard({
           shippingState,
           shippingPostalCode,
           shippingCountry,
+          socialProfiles: {
+            instagramUrl: instagramUrl.trim() || null,
+            tiktokUrl: tiktokUrl.trim() || null,
+            youtubeUrl: youtubeUrl.trim() || null,
+            pinterestUrl: pinterestUrl.trim() || null,
+          },
           petName,
           petBreed,
           petAge,
@@ -307,6 +333,42 @@ export function CampaignProgressCard({
               <Label>Country *</Label>
               <Input value={shippingCountry} onChange={(e) => setShippingCountry(e.target.value)} disabled={!canSubmitPetInfo || saving} />
             </div>
+            <div>
+              <Label>Instagram URL (optional)</Label>
+              <Input
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                disabled={!canSubmitPetInfo || saving}
+                placeholder="https://instagram.com/yourhandle"
+              />
+            </div>
+            <div>
+              <Label>TikTok URL (optional)</Label>
+              <Input
+                value={tiktokUrl}
+                onChange={(e) => setTiktokUrl(e.target.value)}
+                disabled={!canSubmitPetInfo || saving}
+                placeholder="https://tiktok.com/@yourhandle"
+              />
+            </div>
+            <div>
+              <Label>YouTube URL (optional)</Label>
+              <Input
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                disabled={!canSubmitPetInfo || saving}
+                placeholder="https://youtube.com/@yourchannel"
+              />
+            </div>
+            <div>
+              <Label>Pinterest URL (optional)</Label>
+              <Input
+                value={pinterestUrl}
+                onChange={(e) => setPinterestUrl(e.target.value)}
+                disabled={!canSubmitPetInfo || saving}
+                placeholder="https://pinterest.com/yourhandle"
+              />
+            </div>
             <div className="sm:col-span-2">
               <Label>Shipping Address *</Label>
               <Input value={shippingAddressLine1} onChange={(e) => setShippingAddressLine1(e.target.value)} disabled={!canSubmitPetInfo || saving} />
@@ -358,6 +420,10 @@ export function CampaignProgressCard({
                   const value = product.shopifyProductId || product.title || `product-${index}`;
                   const isSelected = selectedProductIds.includes(value);
                   const imageUrls = (product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : []);
+                  const activeImageIndex = Math.min(
+                    carouselIndexByProduct[value] ?? 0,
+                    Math.max(imageUrls.length - 1, 0)
+                  );
                   return (
                     <button
                       key={value}
@@ -372,22 +438,41 @@ export function CampaignProgressCard({
                     >
                       <div className="relative rounded-t-lg bg-gray-100">
                         {imageUrls.length > 0 ? (
-                          <div className="flex aspect-[4/3] w-full snap-x snap-mandatory overflow-x-auto">
-                            {imageUrls.map((url, imageIndex) => (
-                              <div
-                                key={`${value}-image-${imageIndex}`}
-                                className="h-full w-full shrink-0 snap-center"
-                              >
-                                <img
-                                  src={url}
-                                  alt={`${product.title} ${imageIndex + 1}`}
-                                  className="h-full w-full object-cover"
-                                />
-                              </div>
-                            ))}
+                          <div className="relative aspect-square w-full overflow-hidden">
+                            <img
+                              src={imageUrls[activeImageIndex]}
+                              alt={`${product.title} ${activeImageIndex + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                            {imageUrls.length > 1 ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveCarousel(value, imageUrls.length, "prev");
+                                  }}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1 shadow hover:bg-white"
+                                  aria-label="Previous image"
+                                >
+                                  <ChevronLeft className="h-4 w-4 text-gray-700" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveCarousel(value, imageUrls.length, "next");
+                                  }}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-1 shadow hover:bg-white"
+                                  aria-label="Next image"
+                                >
+                                  <ChevronRight className="h-4 w-4 text-gray-700" />
+                                </button>
+                              </>
+                            ) : null}
                           </div>
                         ) : (
-                          <div className="flex aspect-[4/3] h-full w-full items-center justify-center text-xs text-gray-400">
+                          <div className="flex aspect-square h-full w-full items-center justify-center text-xs text-gray-400">
                             No image
                           </div>
                         )}
@@ -395,11 +480,6 @@ export function CampaignProgressCard({
                           {isSelected ? <Check className="h-4 w-4 text-rose-600" /> : null}
                         </div>
                       </div>
-                      {imageUrls.length > 1 ? (
-                        <div className="px-3 pb-1 pt-2 text-[11px] text-gray-500">
-                          Swipe image carousel to view all product photos
-                        </div>
-                      ) : null}
                       <div className="space-y-2 px-3 pb-3">
                         <p className="text-sm font-semibold text-gray-900">{product.title}</p>
                         <div>

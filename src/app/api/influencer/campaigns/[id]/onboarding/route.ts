@@ -5,6 +5,7 @@ import {
   db,
   users,
   influencerProfiles,
+  socialAccounts,
   campaignInfluencers,
   campaigns,
   shipments,
@@ -26,6 +27,26 @@ type SelectedProductInput = {
   personalizationText?: string | null;
   imageUrl?: string | null;
 };
+
+type SocialProfilesInput = {
+  instagramUrl?: string | null;
+  tiktokUrl?: string | null;
+  youtubeUrl?: string | null;
+  pinterestUrl?: string | null;
+};
+
+function parseHandleFromUrl(url: string) {
+  const value = url.trim();
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    const segment = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+    return segment.replace(/^@/, "");
+  } catch {
+    const sanitized = value.replace(/^https?:\/\//i, "").split("/")[1] ?? "";
+    return sanitized.replace(/^@/, "");
+  }
+}
 
 export async function PATCH(
   req: Request,
@@ -55,6 +76,7 @@ export async function PATCH(
       selectedProductId?: string;
       selectedProductTitle?: string;
       selectedProductVariantId?: string;
+      socialProfiles?: SocialProfilesInput;
     };
 
     const [user] = await db
@@ -199,6 +221,14 @@ export async function PATCH(
     const normalizedCountry =
       body.shippingCountry?.trim().toUpperCase().slice(0, 2) || "US";
 
+    const socialProfiles = body.socialProfiles ?? {};
+    const socialUpserts = [
+      { platform: "instagram" as const, url: String(socialProfiles.instagramUrl ?? "").trim() },
+      { platform: "tiktok" as const, url: String(socialProfiles.tiktokUrl ?? "").trim() },
+      { platform: "youtube" as const, url: String(socialProfiles.youtubeUrl ?? "").trim() },
+      { platform: "pinterest" as const, url: String(socialProfiles.pinterestUrl ?? "").trim() },
+    ].filter((item) => item.url.length > 0);
+
     await db
       .update(influencerProfiles)
       .set({
@@ -214,6 +244,26 @@ export async function PATCH(
         updatedAt: new Date(),
       })
       .where(eq(influencerProfiles.id, profile.id));
+
+    for (const account of socialUpserts) {
+      await db
+        .insert(socialAccounts)
+        .values({
+          influencerProfileId: profile.id,
+          platform: account.platform,
+          handle: parseHandleFromUrl(account.url) || account.platform,
+          profileUrl: account.url,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [socialAccounts.influencerProfileId, socialAccounts.platform],
+          set: {
+            profileUrl: account.url,
+            handle: parseHandleFromUrl(account.url) || account.platform,
+            updatedAt: new Date(),
+          },
+        });
+    }
 
     await db
       .update(campaignInfluencers)

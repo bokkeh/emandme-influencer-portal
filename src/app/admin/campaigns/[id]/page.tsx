@@ -75,6 +75,7 @@ export default async function CampaignDetailPage({
     contractStatus: string | null;
     proposedFee: string | null;
     agreedFee: string | null;
+    includesFreeProduct: boolean;
     contractUrl: string | null;
     contentDueDate: Date | null;
     influencerId: string;
@@ -100,6 +101,7 @@ export default async function CampaignDetailPage({
           contractStatus: campaignInfluencers.contractStatus,
           proposedFee: campaignInfluencers.proposedFee,
           agreedFee: campaignInfluencers.agreedFee,
+          includesFreeProduct: campaignInfluencers.includesFreeProduct,
           contractUrl: campaignInfluencers.contractUrl,
           contentDueDate: campaignInfluencers.contentDueDate,
           influencerId: influencerProfiles.id,

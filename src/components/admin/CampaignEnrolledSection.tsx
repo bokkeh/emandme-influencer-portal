@@ -12,6 +12,7 @@ type EnrollmentRow = {
   contractStatus: string | null;
   proposedFee: string | null;
   agreedFee: string | null;
+  includesFreeProduct: boolean;
   contractUrl: string | null;
   contentDueDate: Date | string | null;
   influencerId: string;

@@ -147,6 +147,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
           contractStatus: campaignInfluencers.contractStatus,
           proposedFee: campaignInfluencers.proposedFee,
           agreedFee: campaignInfluencers.agreedFee,
+          includesFreeProduct: campaignInfluencers.includesFreeProduct,
           contractUrl: campaignInfluencers.contractUrl,
           contentDueDate: campaignInfluencers.contentDueDate,
           influencerId: influencerProfiles.id,
@@ -308,6 +309,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const body = (await req.json()) as {
       candidateId?: string;
       agreedFee?: number | string | null;
+      includesFreeProduct?: boolean;
       contentDueDate?: string | null;
       notes?: string | null;
     };
@@ -338,6 +340,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           body.agreedFee !== null && body.agreedFee !== undefined && body.agreedFee !== ""
             ? String(body.agreedFee)
             : null,
+        includesFreeProduct: Boolean(body.includesFreeProduct),
         contentDueDate: body.contentDueDate ? new Date(body.contentDueDate) : null,
         notes: body.notes?.trim() || null,
       })

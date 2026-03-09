@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Candidate = {
   id: string;
@@ -31,6 +32,7 @@ export function CampaignEnrollmentManager({ campaignId, campaignType = "influenc
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidateId, setCandidateId] = useState("");
   const [agreedFee, setAgreedFee] = useState("");
+  const [includesFreeProduct, setIncludesFreeProduct] = useState(false);
   const [contentDueDate, setContentDueDate] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -62,6 +64,7 @@ export function CampaignEnrollmentManager({ campaignId, campaignType = "influenc
     if (nextOpen) {
       setCandidateId("");
       setAgreedFee("");
+      setIncludesFreeProduct(false);
       setContentDueDate("");
       setNotes("");
       await loadCandidates();
@@ -81,6 +84,7 @@ export function CampaignEnrollmentManager({ campaignId, campaignType = "influenc
         body: JSON.stringify({
           candidateId,
           agreedFee: agreedFee ? Number(agreedFee) : null,
+          includesFreeProduct,
           contentDueDate: contentDueDate || null,
           notes: notes || null,
         }),
@@ -141,6 +145,16 @@ export function CampaignEnrollmentManager({ campaignId, campaignType = "influenc
                   value={agreedFee}
                   onChange={(e) => setAgreedFee(e.target.value)}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="enroll-includes-free-product"
+                  checked={includesFreeProduct}
+                  onCheckedChange={(checked) => setIncludesFreeProduct(Boolean(checked))}
+                />
+                <Label htmlFor="enroll-includes-free-product" className="cursor-pointer">
+                  Includes free product
+                </Label>
               </div>
               <div>
                 <Label>Content Due Date (optional)</Label>
