@@ -123,18 +123,17 @@ export async function sendAssetReviewEmailViaHubSpot({
   const fullName = `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim();
   const reviewedAt = new Date();
   reviewedAt.setUTCHours(0, 0, 0, 0);
-  const properties: Record<string, string> = {
+  const baseProperties: Record<string, string> = {
     email: profile.userEmail,
     firstname: profile.userFirstName ?? "",
     lastname: profile.userLastName ?? "",
-    [statusProp]: status,
     [feedbackProp]: reviewNotes ?? "",
     [titleProp]: assetTitle ?? "",
     [campaignProp]: campaignTitle ?? "",
     [reviewedAtProp]: String(reviewedAt.getTime()),
   };
   if (influencerNameProp) {
-    properties[influencerNameProp] = fullName || profile.userEmail;
+    baseProperties[influencerNameProp] = fullName || profile.userEmail;
   }
 
   let contactId = "";
@@ -153,10 +152,14 @@ export async function sendAssetReviewEmailViaHubSpot({
   }
 
   if (contactId) {
-    await hubspot.updateContact(contactId, properties);
+    // Write supporting fields first, then flip status in a second update so
+    // workflow enrollment sees the freshest feedback/title/campaign values.
+    await hubspot.updateContact(contactId, baseProperties);
+    await hubspot.updateContact(contactId, { [statusProp]: status });
   } else {
-    const created = await hubspot.createContact(properties);
+    const created = await hubspot.createContact(baseProperties);
     contactId = String(created.id);
+    await hubspot.updateContact(contactId, { [statusProp]: status });
   }
 
   await db
@@ -173,7 +176,10 @@ export async function sendAssetReviewEmailViaHubSpot({
     debug: {
       recipientEmail: profile.userEmail,
       contactId,
-      properties,
+      properties: {
+        ...baseProperties,
+        [statusProp]: status,
+      },
     },
   };
 }
