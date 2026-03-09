@@ -144,7 +144,17 @@ export function CampaignContentLibraryManager({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {campaignAssets.map((asset) => (
                 <div key={asset.id} className="rounded-md border border-gray-200 p-2">
-                  {asset.thumbnailUrl ? (
+                  {asset.fileType === "video" ? (
+                    <video
+                      className="h-28 w-full rounded bg-black object-cover"
+                      controls
+                      preload="metadata"
+                      playsInline
+                      poster={asset.thumbnailUrl ?? undefined}
+                    >
+                      <source src={asset.blobUrl} />
+                    </video>
+                  ) : asset.thumbnailUrl ? (
                     <img src={asset.thumbnailUrl} alt={asset.title ?? "Asset"} className="h-28 w-full rounded object-cover" />
                   ) : (
                     <div className="flex h-28 items-center justify-center rounded bg-gray-100 text-xs text-gray-500">
@@ -182,13 +192,23 @@ export function CampaignContentLibraryManager({
           />
           {uploading ? <p className="text-xs text-gray-500">Uploading...</p> : null}
           {media.length > 0 ? (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {media.map((item, index) => (
-                <div key={`${item.url}-${index}`} className="flex items-center justify-between rounded bg-gray-50 p-2 text-sm">
-                  <p className="truncate pr-3 text-gray-700">{item.name ?? item.url}</p>
-                  <div className="flex items-center gap-2">
+                <div key={`${item.url}-${index}`} className="rounded border border-gray-200 bg-gray-50 p-2 text-sm">
+                  {item.fileType === "video" ? (
+                    <video className="h-28 w-full rounded bg-black object-cover" controls preload="metadata" playsInline>
+                      <source src={item.url} />
+                    </video>
+                  ) : (
+                    <img src={item.url} alt={item.name ?? "Uploaded media"} className="h-28 w-full rounded object-cover" />
+                  )}
+                  <p className="mt-2 truncate pr-3 text-gray-700">{item.name ?? item.url}</p>
+                  <div className="mt-2 flex items-center gap-2">
                     <a href={item.url} download className="text-xs text-rose-600 underline">
                       Download
+                    </a>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-600 underline">
+                      Open
                     </a>
                     <Button
                       type="button"
@@ -270,4 +290,3 @@ export function CampaignContentLibraryManager({
     </div>
   );
 }
-

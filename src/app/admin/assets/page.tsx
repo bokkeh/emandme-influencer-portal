@@ -50,56 +50,46 @@ export default async function AssetsPage() {
           {allAssets.map((asset) => {
             const name =
               (asset.influencerName ??
-              `${asset.userFirstName ?? ""} ${asset.userLastName ?? ""}`.trim()) ||
+                `${asset.userFirstName ?? ""} ${asset.userLastName ?? ""}`.trim()) ||
               asset.userEmail;
             return (
-              <Card key={asset.id} className="border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                <div className="relative bg-gray-100 h-40 flex items-center justify-center">
-                  {asset.thumbnailUrl ? (
+              <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm transition-shadow hover:shadow-md">
+                <div className="relative flex h-40 items-center justify-center bg-gray-100">
+                  {asset.fileType === "video" ? (
+                    <video
+                      className="h-full w-full bg-black object-cover"
+                      controls
+                      preload="metadata"
+                      playsInline
+                      poster={asset.thumbnailUrl ?? undefined}
+                    >
+                      <source src={asset.blobUrl} />
+                    </video>
+                  ) : asset.thumbnailUrl ? (
                     <img
                       src={asset.thumbnailUrl}
                       alt={asset.title ?? "Asset"}
                       className="h-full w-full object-cover"
                     />
-                  ) : asset.fileType === "video" ? (
-                    <div className="flex flex-col items-center text-gray-400">
-                      <span className="text-3xl">🎬</span>
-                      <span className="text-xs mt-1">Video</span>
-                    </div>
                   ) : (
-                    <div className="flex flex-col items-center text-gray-400">
-                      <span className="text-3xl">🖼️</span>
-                      <span className="text-xs mt-1">Image</span>
-                    </div>
+                    <div className="text-xs text-gray-500">No preview</div>
                   )}
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute right-2 top-2">
                     <StatusBadge status={asset.status} />
                   </div>
                 </div>
                 <CardContent className="p-3">
-                  <p className="text-xs font-medium text-gray-900 truncate">
-                    {asset.title ?? "Untitled"}
-                  </p>
+                  <p className="truncate text-xs font-medium text-gray-900">{asset.title ?? "Untitled"}</p>
                   <Link
                     href={`/admin/influencers/${asset.influencerId}`}
-                    className="text-xs text-gray-400 hover:text-rose-600 truncate block"
+                    className="block truncate text-xs text-gray-400 hover:text-rose-600"
                   >
                     {name}
                   </Link>
                   {asset.platform && <PlatformBadge platform={asset.platform} />}
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="mt-1 text-xs text-gray-400">
                     {formatDistanceToNow(new Date(asset.createdAt), { addSuffix: true })}
                   </p>
-                  {asset.status === "pending_review" && (
-                    <div className="mt-2 flex gap-1.5">
-                      <button className="flex-1 rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700">
-                        Approve
-                      </button>
-                      <button className="flex-1 rounded bg-red-100 px-2 py-1 text-xs text-red-700 hover:bg-red-200">
-                        Reject
-                      </button>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );

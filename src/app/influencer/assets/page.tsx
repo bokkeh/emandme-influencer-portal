@@ -36,7 +36,7 @@ export default async function InfluencerAssetsPage() {
           <p className="text-sm text-gray-500">{myAssets.length} assets submitted</p>
         </div>
         <Link href="/influencer/upload">
-          <Button className="bg-rose-600 hover:bg-rose-700 gap-2">
+          <Button className="gap-2 bg-rose-600 hover:bg-rose-700">
             <Upload className="h-4 w-4" />
             Upload More
           </Button>
@@ -57,33 +57,43 @@ export default async function InfluencerAssetsPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {myAssets.map((asset) => {
-            const metrics = asset.metrics as Record<string, number> ?? {};
+            const metrics = (asset.metrics as Record<string, number>) ?? {};
             return (
-              <Card key={asset.id} className="border border-gray-200 shadow-sm overflow-hidden">
-                <div className="relative bg-gray-100 h-40 flex items-center justify-center">
-                  {asset.thumbnailUrl ? (
+              <Card key={asset.id} className="overflow-hidden border border-gray-200 shadow-sm">
+                <div className="relative flex h-40 items-center justify-center bg-gray-100">
+                  {asset.fileType === "video" ? (
+                    <video
+                      className="h-full w-full bg-black object-cover"
+                      controls
+                      preload="metadata"
+                      playsInline
+                      poster={asset.thumbnailUrl ?? undefined}
+                    >
+                      <source src={asset.blobUrl} />
+                    </video>
+                  ) : asset.thumbnailUrl ? (
                     <img src={asset.thumbnailUrl} alt={asset.title ?? "Asset"} className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-3xl">{asset.fileType === "video" ? "🎬" : "🖼️"}</span>
+                    <span className="text-xs text-gray-500">No preview</span>
                   )}
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute left-2 top-2">
                     <StatusBadge status={asset.status} />
                   </div>
                 </div>
-                <CardContent className="p-3 space-y-1.5">
-                  <p className="text-xs font-medium text-gray-900 truncate">{asset.title ?? "Untitled"}</p>
+                <CardContent className="space-y-1.5 p-3">
+                  <p className="truncate text-xs font-medium text-gray-900">{asset.title ?? "Untitled"}</p>
                   {asset.platform && <PlatformBadge platform={asset.platform} />}
                   <p className="text-xs text-gray-400">
                     {formatDistanceToNow(new Date(asset.createdAt), { addSuffix: true })}
                   </p>
                   {Object.keys(metrics).length > 0 && (
-                    <div className="flex gap-3 text-xs text-gray-500 mt-1">
-                      {metrics.views && <span>👁 {metrics.views.toLocaleString()}</span>}
-                      {metrics.likes && <span>❤️ {metrics.likes.toLocaleString()}</span>}
+                    <div className="mt-1 flex gap-3 text-xs text-gray-500">
+                      {metrics.views ? <span>Views {metrics.views.toLocaleString()}</span> : null}
+                      {metrics.likes ? <span>Likes {metrics.likes.toLocaleString()}</span> : null}
                     </div>
                   )}
                   {asset.reviewNotes && asset.status === "rejected" && (
-                    <p className="text-xs text-red-500 bg-red-50 rounded p-1.5 mt-1">{asset.reviewNotes}</p>
+                    <p className="mt-1 rounded bg-red-50 p-1.5 text-xs text-red-500">{asset.reviewNotes}</p>
                   )}
                 </CardContent>
               </Card>
