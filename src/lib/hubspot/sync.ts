@@ -29,6 +29,11 @@ export async function syncInfluencerToHubSpot({ influencerProfileId }: SyncParam
 
   if (!profile) return { success: false as const, reason: "PROFILE_NOT_FOUND" as const };
 
+  const profileIdProp =
+    process.env.HUBSPOT_INFLUENCER_PROFILE_ID_PROPERTY?.trim() || "influencer_profile_id";
+  const profileUrlProp =
+    process.env.HUBSPOT_PORTAL_PROFILE_URL_PROPERTY?.trim() || "portal_profile_url";
+
   const properties: Record<string, string> = {
     email: profile.userEmail,
     firstname: profile.userFirstName ?? "",
@@ -38,7 +43,8 @@ export async function syncInfluencerToHubSpot({ influencerProfileId }: SyncParam
     total_revenue_generated: profile.totalEarnings ?? "0",
     total_campaigns: String(profile.totalCampaigns),
     stripe_payout_status: profile.stripeAccountStatus,
-    portal_profile_url: `${process.env.NEXT_PUBLIC_APP_URL}/admin/influencers/${profile.id}`,
+    [profileIdProp]: profile.id,
+    [profileUrlProp]: `${process.env.NEXT_PUBLIC_APP_URL}/admin/influencers/${profile.id}`,
   };
 
   let contactId = profile.hubspotContactId;
