@@ -58,17 +58,29 @@ export async function PATCH(
 
   if (!updated) return new NextResponse("Asset not found", { status: 404 });
 
-  sendAssetReviewEmailViaHubSpot({
-    influencerProfileId: existing.influencerProfileId,
-    status: body.status,
-    campaignTitle: existing.campaignTitle,
-    assetTitle: existing.title,
-    reviewNotes: body.reviewNotes ?? null,
-  }).catch((error) => {
+  let emailSent = false;
+  let emailError: string | null = null;
+  try {
+    const emailResult = await sendAssetReviewEmailViaHubSpot({
+      influencerProfileId: existing.influencerProfileId,
+      status: body.status,
+      campaignTitle: existing.campaignTitle,
+      assetTitle: existing.title,
+      reviewNotes: body.reviewNotes ?? null,
+    });
+    emailSent = emailResult.sent;
+    if (!emailResult.sent) {
+      emailError =
+        emailResult.reason === "MISSING_TEMPLATE_ID"
+          ? "Missing HUBSPOT_ASSET_APPROVED_EMAIL_ID / HUBSPOT_ASSET_REJECTED_EMAIL_ID"
+          : "Influencer email is missing";
+    }
+  } catch (error) {
+    emailError = error instanceof Error ? error.message : "Unknown HubSpot email error";
     console.error("[HubSpot] Failed to send asset review email:", error);
-  });
+  }
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, emailSent, emailError });
 }
 
 export async function DELETE(

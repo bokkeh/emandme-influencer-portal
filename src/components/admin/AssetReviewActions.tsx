@@ -29,7 +29,11 @@ export function AssetReviewActions({ assetId, currentStatus, initialReviewNotes 
         const message = (await res.text()) || "Failed to update asset review";
         throw new Error(message);
       }
+      const data = (await res.json()) as { emailSent?: boolean; emailError?: string | null };
       toast.success(`Asset ${status.replace("_", " ")}.`);
+      if (data.emailSent === false) {
+        toast.warning(data.emailError ?? "HubSpot email did not send.");
+      }
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update asset review";

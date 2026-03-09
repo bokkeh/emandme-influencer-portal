@@ -105,7 +105,7 @@ export async function sendAssetReviewEmailViaHubSpot({
     .where(eq(influencerProfiles.id, influencerProfileId))
     .limit(1);
 
-  if (!profile?.userEmail) return;
+  if (!profile?.userEmail) return { sent: false as const, reason: "MISSING_EMAIL" as const };
 
   const emailIdRaw =
     status === "approved"
@@ -113,9 +113,7 @@ export async function sendAssetReviewEmailViaHubSpot({
       : process.env.HUBSPOT_ASSET_REJECTED_EMAIL_ID;
   const emailId = Number(emailIdRaw);
   if (!Number.isFinite(emailId)) {
-    // Keep this non-fatal so asset review actions still succeed.
-    console.warn(`[HubSpot] Missing email template id for asset review status "${status}"`);
-    return;
+    return { sent: false as const, reason: "MISSING_TEMPLATE_ID" as const };
   }
 
   const fullName = `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim();
@@ -136,4 +134,6 @@ export async function sendAssetReviewEmailViaHubSpot({
       asset_feedback: reviewNotes ?? "",
     },
   });
+
+  return { sent: true as const };
 }
