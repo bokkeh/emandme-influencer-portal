@@ -112,19 +112,24 @@ export async function sendAssetReviewEmailViaHubSpot({
   const titleProp = process.env.HUBSPOT_ASSET_TITLE_PROPERTY?.trim() || "asset_title";
   const campaignProp = process.env.HUBSPOT_CAMPAIGN_TITLE_PROPERTY?.trim() || "campaign_title";
   const reviewedAtProp = process.env.HUBSPOT_ASSET_REVIEWED_AT_PROPERTY?.trim() || "asset_reviewed_at";
+  const influencerNameProp = process.env.HUBSPOT_INFLUENCER_NAME_PROPERTY?.trim();
 
   const fullName = `${profile.userFirstName ?? ""} ${profile.userLastName ?? ""}`.trim();
+  const reviewedAt = new Date();
+  reviewedAt.setUTCHours(0, 0, 0, 0);
   const properties: Record<string, string> = {
     email: profile.userEmail,
     firstname: profile.userFirstName ?? "",
     lastname: profile.userLastName ?? "",
-    influencer_name: fullName || profile.userEmail,
     [statusProp]: status,
     [feedbackProp]: reviewNotes ?? "",
     [titleProp]: assetTitle ?? "",
     [campaignProp]: campaignTitle ?? "",
-    [reviewedAtProp]: new Date().toISOString(),
+    [reviewedAtProp]: String(reviewedAt.getTime()),
   };
+  if (influencerNameProp) {
+    properties[influencerNameProp] = fullName || profile.userEmail;
+  }
 
   let contactId = "";
   const [existingProfile] = await db
