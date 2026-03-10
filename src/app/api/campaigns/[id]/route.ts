@@ -112,3 +112,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return new NextResponse(message, { status: 500 });
   }
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdminApi();
+  if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
+
+  try {
+    const { id } = await params;
+    const [deleted] = await db
+      .delete(campaigns)
+      .where(eq(campaigns.id, id))
+      .returning({ id: campaigns.id });
+
+    if (!deleted) return new NextResponse("Campaign not found", { status: 404 });
+    return NextResponse.json({ ok: true, id: deleted.id });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete campaign";
+    return new NextResponse(message, { status: 500 });
+  }
+}
