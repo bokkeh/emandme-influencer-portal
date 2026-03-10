@@ -1257,6 +1257,7 @@ export function RosterClient({
                         Tags {sortIndicator("tags")}
                       </button>
                     </TableHead>
+                    <TableHead>Stripe</TableHead>
                     <TableHead className="text-right">Quick Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1707,6 +1708,19 @@ export function RosterClient({
                               )}
                             </div>
                           </button>
+                        )}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {row.stripePayoutStatus === "active" ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100 text-[10px]">Connected</Badge>
+                        ) : row.stripePayoutStatus === "pending" ? (
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 text-[10px]">Pending</Badge>
+                        ) : row.stripePayoutStatus === "restricted" ? (
+                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100 text-[10px]">Restricted</Badge>
+                        ) : row.stripePayoutStatus === "disabled" ? (
+                          <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100 text-[10px]">Disabled</Badge>
+                        ) : (
+                          <Badge className="bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100 text-[10px]">Not set</Badge>
                         )}
                       </TableCell>
                       <TableCell>
