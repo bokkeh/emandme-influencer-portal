@@ -390,10 +390,10 @@ export function ShippingTrackerClient({
               onChange={(e) => setSearch(e.target.value)}
             />
             <div className="overflow-x-auto">
-              <Table className="min-w-[1400px] table-fixed">
+              <Table className="min-w-[1560px] table-fixed">
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead>Influencer</TableHead>
+                    <TableHead className="w-[160px]">Influencer</TableHead>
                     <TableHead className="w-[460px]">Products</TableHead>
                     <TableHead className="w-[200px]">Ship To</TableHead>
                     <TableHead className="w-[180px]">Status</TableHead>
