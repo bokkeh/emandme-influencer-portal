@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ExternalLink, Package, Plus } from "lucide-react";
+import { ExternalLink, Package, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -69,6 +69,10 @@ type ShipmentRow = {
   userEmail: string;
   userFirstName: string | null;
   userLastName: string | null;
+  shippingAddressLine1: string | null;
+  shippingCity: string | null;
+  shippingState: string | null;
+  shippingPostalCode: string | null;
 };
 
 type InfluencerOption = {
@@ -98,48 +102,24 @@ function parseProductsInput(raw: string): ShipmentProduct[] {
     .filter((item) => item.name);
 }
 
-function getProductHero(products: ShipmentProduct[] | null) {
-  if (!products || products.length === 0) return null;
-  const firstWithImage = products.find(
-    (product) =>
-      Boolean(product.imageUrl?.trim()) ||
-      (Array.isArray(product.imageUrls) && product.imageUrls.some((url) => Boolean(url?.trim())))
-  );
-  if (!firstWithImage) return null;
-  const imageUrl =
-    firstWithImage.imageUrl?.trim() ||
-    firstWithImage.imageUrls?.find((url) => Boolean(url?.trim())) ||
+function getImageForProduct(
+  product: ShipmentProduct,
+  campaignProducts?: Array<{ title?: string; imageUrl?: string; imageUrls?: string[] }> | null
+): string | null {
+  const own =
+    product.imageUrl?.trim() ||
+    product.imageUrls?.find((u) => Boolean(u?.trim())) ||
     null;
-  if (!imageUrl) return null;
-  return {
-    imageUrl,
-    name: firstWithImage.name,
-  };
-}
-
-function getCampaignHeroFromTitle(
-  products: ShipmentProduct[] | null,
-  campaignProducts?:
-    | Array<{
-        title?: string;
-        imageUrl?: string;
-        imageUrls?: string[];
-      }>
-    | null
-) {
-  if (!products?.length || !campaignProducts?.length) return null;
-  const firstNamed = products.find((p) => Boolean(p.name?.trim()));
-  if (!firstNamed) return null;
-  const match = campaignProducts.find(
-    (cp) => (cp.title ?? "").trim().toLowerCase() === firstNamed.name.trim().toLowerCase()
-  );
-  if (!match) return null;
-  const imageUrl = match.imageUrl?.trim() || match.imageUrls?.find((url) => Boolean(url?.trim())) || null;
-  if (!imageUrl) return null;
-  return {
-    imageUrl,
-    name: match.title || firstNamed.name,
-  };
+  if (own) return own;
+  if (campaignProducts?.length) {
+    const match = campaignProducts.find(
+      (cp) => (cp.title ?? "").trim().toLowerCase() === product.name.trim().toLowerCase()
+    );
+    if (match) {
+      return match.imageUrl?.trim() || match.imageUrls?.find((u) => Boolean(u?.trim())) || null;
+    }
+  }
+  return null;
 }
 
 export function ShippingTrackerClient({
@@ -231,6 +211,10 @@ export function ShippingTrackerClient({
           userEmail: selectedInfluencer?.email ?? "",
           userFirstName: null,
           userLastName: null,
+          shippingAddressLine1: null,
+          shippingCity: null,
+          shippingState: null,
+          shippingPostalCode: null,
         },
         ...prev,
       ]);
@@ -275,6 +259,19 @@ export function ShippingTrackerClient({
       toast.success("Shipment status updated.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to update status";
+      toast.error(message);
+    }
+  }
+
+  async function deleteShipment(shipmentId: string) {
+    if (!confirm("Delete this shipment? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/admin/shipments/${shipmentId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.text()) || "Failed to delete shipment");
+      setShipments((prev) => prev.filter((item) => item.id !== shipmentId));
+      toast.success("Shipment deleted.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete shipment";
       toast.error(message);
     }
   }
@@ -393,17 +390,18 @@ export function ShippingTrackerClient({
               onChange={(e) => setSearch(e.target.value)}
             />
             <div className="overflow-x-auto">
-              <Table className="min-w-[1200px] table-fixed">
+              <Table className="min-w-[1400px] table-fixed">
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead className="w-[110px]">Product</TableHead>
                     <TableHead>Influencer</TableHead>
-                    <TableHead className="w-[430px]">Products</TableHead>
+                    <TableHead className="w-[460px]">Products</TableHead>
+                    <TableHead className="w-[200px]">Ship To</TableHead>
                     <TableHead className="w-[180px]">Status</TableHead>
                     <TableHead className="w-[110px]">Carrier</TableHead>
                     <TableHead className="w-[130px]">Tracking</TableHead>
                     <TableHead className="w-[120px]">Shipped</TableHead>
                     <TableHead className="w-[130px]">Est. Delivery</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -412,24 +410,11 @@ export function ShippingTrackerClient({
                       (s.influencerName ??
                         `${s.userFirstName ?? ""} ${s.userLastName ?? ""}`.trim()) ||
                       s.userEmail;
-                    const hero = getProductHero(s.products) ?? getCampaignHeroFromTitle(s.products, s.campaignProducts);
+                    const addressLine2 = [s.shippingCity, s.shippingState, s.shippingPostalCode]
+                      .filter(Boolean)
+                      .join(", ");
                     return (
                       <TableRow key={s.id}>
-                        <TableCell className="align-top">
-                          {hero ? (
-                            <div className="w-[80px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                              <img
-                                src={hero.imageUrl}
-                                alt={hero.name}
-                                className="h-[80px] w-[80px] object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex h-[80px] w-[80px] items-center justify-center rounded-lg border border-dashed border-gray-300 text-xs text-gray-400">
-                              No image
-                            </div>
-                          )}
-                        </TableCell>
                         <TableCell>
                           <Link
                             href={`/admin/influencers/${s.influencerId}`}
@@ -438,24 +423,50 @@ export function ShippingTrackerClient({
                             {name}
                           </Link>
                         </TableCell>
-                        <TableCell className="max-w-[420px] align-top">
+                        <TableCell className="align-top">
                           {s.products && s.products.length > 0 ? (
-                            <div className="space-y-1">
-                              {s.products.map((p, idx) => (
-                                <div key={`${s.id}-product-${idx}`} className="rounded bg-gray-50 p-2">
-                                  <p className="text-sm font-medium text-gray-700">
-                                    {p.name} x{p.qty}
-                                  </p>
-                                  {p.personalizationText ? (
-                                    <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-gray-500">
-                                      Personalization: {p.personalizationText}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ))}
+                            <div className="space-y-2">
+                              {s.products.map((p, idx) => {
+                                const img = getImageForProduct(p, s.campaignProducts);
+                                return (
+                                  <div key={`${s.id}-product-${idx}`} className="flex items-start gap-2 rounded bg-gray-50 p-2">
+                                    {img ? (
+                                      <img
+                                        src={img}
+                                        alt={p.name}
+                                        className="h-[56px] w-[56px] shrink-0 rounded object-cover border border-gray-200"
+                                      />
+                                    ) : (
+                                      <div className="flex h-[56px] w-[56px] shrink-0 items-center justify-center rounded border border-dashed border-gray-300 text-[10px] text-gray-400">
+                                        No img
+                                      </div>
+                                    )}
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-700">
+                                        {p.name} x{p.qty}
+                                      </p>
+                                      {p.personalizationText ? (
+                                        <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-gray-500">
+                                          Personalization: {p.personalizationText}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          {s.shippingAddressLine1 ? (
+                            <div className="text-xs text-gray-600 space-y-0.5">
+                              <p>{s.shippingAddressLine1}</p>
+                              {addressLine2 && <p>{addressLine2}</p>}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">No address on file</span>
                           )}
                         </TableCell>
                         <TableCell className="min-w-[180px] space-y-2 align-top">
@@ -499,6 +510,16 @@ export function ShippingTrackerClient({
                           {s.estimatedDeliveryAt
                             ? format(new Date(s.estimatedDeliveryAt), "MMM d, yyyy")
                             : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-gray-400 hover:text-red-600"
+                            onClick={() => void deleteShipment(s.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );

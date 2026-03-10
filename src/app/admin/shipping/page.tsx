@@ -24,6 +24,10 @@ export default async function ShippingPage() {
         userEmail: users.email,
         userFirstName: users.firstName,
         userLastName: users.lastName,
+        shippingAddressLine1: influencerProfiles.shippingAddressLine1,
+        shippingCity: influencerProfiles.shippingCity,
+        shippingState: influencerProfiles.shippingState,
+        shippingPostalCode: influencerProfiles.shippingPostalCode,
       })
       .from(shipments)
       .innerJoin(influencerProfiles, eq(shipments.influencerProfileId, influencerProfiles.id))

@@ -111,3 +111,25 @@ export async function PATCH(
     return new NextResponse(message, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const guard = await requireAdminApi();
+  if (!guard.ok) return new NextResponse(guard.message, { status: guard.status });
+
+  try {
+    const { id } = await params;
+    const [deleted] = await db
+      .delete(shipments)
+      .where(eq(shipments.id, id))
+      .returning({ id: shipments.id });
+
+    if (!deleted) return new NextResponse("Shipment not found", { status: 404 });
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete shipment";
+    return new NextResponse(message, { status: 500 });
+  }
+}
