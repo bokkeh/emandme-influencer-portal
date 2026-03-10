@@ -2,7 +2,55 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db, users, influencerProfiles } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { createStripeConnectAccount, createStripeOnboardingLink } from "@/lib/stripe/connect";
+import { createStripeConnectAccount, createStripeOnboardingLink, getStripeAccountStatus } from "@/lib/stripe/connect";
+
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkUserId, userId))
+    .limit(1);
+
+  if (!user) return new NextResponse("User not found", { status: 404 });
+
+  const [profile] = await db
+    .select({
+      id: influencerProfiles.id,
+      stripeAccountId: influencerProfiles.stripeAccountId,
+    })
+    .from(influencerProfiles)
+    .where(eq(influencerProfiles.userId, user.id))
+    .limit(1);
+
+  if (!profile?.stripeAccountId) {
+    return NextResponse.json({ stripeAccountStatus: "not_connected", stripePayoutsEnabled: false, stripeDetailsSubmitted: false });
+  }
+
+  try {
+    const status = await getStripeAccountStatus(profile.stripeAccountId);
+    const stripeAccountStatus = status.payoutsEnabled ? "active" : status.detailsSubmitted ? "pending" : "not_connected";
+
+    await db
+      .update(influencerProfiles)
+      .set({
+        stripeAccountStatus,
+        stripeDetailsSubmitted: status.detailsSubmitted,
+        stripePayoutsEnabled: status.payoutsEnabled ?? false,
+      })
+      .where(eq(influencerProfiles.id, profile.id));
+
+    return NextResponse.json({
+      stripeAccountStatus,
+      stripePayoutsEnabled: status.payoutsEnabled,
+      stripeDetailsSubmitted: status.detailsSubmitted,
+    });
+  } catch {
+    return new NextResponse("Failed to fetch Stripe status", { status: 500 });
+  }
+}
 
 export async function POST() {
   const { userId } = await auth();

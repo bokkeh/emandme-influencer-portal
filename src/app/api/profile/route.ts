@@ -24,6 +24,9 @@ export async function GET() {
         shippingState: influencerProfiles.shippingState,
         shippingPostalCode: influencerProfiles.shippingPostalCode,
         shippingCountry: influencerProfiles.shippingCountry,
+        stripeAccountStatus: influencerProfiles.stripeAccountStatus,
+        stripeDetailsSubmitted: influencerProfiles.stripeDetailsSubmitted,
+        stripePayoutsEnabled: influencerProfiles.stripePayoutsEnabled,
       })
       .from(users)
       .leftJoin(influencerProfiles, eq(influencerProfiles.userId, users.id))
