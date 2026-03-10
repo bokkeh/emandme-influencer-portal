@@ -48,6 +48,13 @@ type ShipmentProduct = {
 type ShipmentRow = {
   id: string;
   products: ShipmentProduct[] | null;
+  campaignProducts:
+    | Array<{
+        title?: string;
+        imageUrl?: string;
+        imageUrls?: string[];
+      }>
+    | null;
   status: ShipmentStatus;
   carrier: string | null;
   trackingNumber: string | null;
@@ -107,6 +114,31 @@ function getProductHero(products: ShipmentProduct[] | null) {
   return {
     imageUrl,
     name: firstWithImage.name,
+  };
+}
+
+function getCampaignHeroFromTitle(
+  products: ShipmentProduct[] | null,
+  campaignProducts?:
+    | Array<{
+        title?: string;
+        imageUrl?: string;
+        imageUrls?: string[];
+      }>
+    | null
+) {
+  if (!products?.length || !campaignProducts?.length) return null;
+  const firstNamed = products.find((p) => Boolean(p.name?.trim()));
+  if (!firstNamed) return null;
+  const match = campaignProducts.find(
+    (cp) => (cp.title ?? "").trim().toLowerCase() === firstNamed.name.trim().toLowerCase()
+  );
+  if (!match) return null;
+  const imageUrl = match.imageUrl?.trim() || match.imageUrls?.find((url) => Boolean(url?.trim())) || null;
+  if (!imageUrl) return null;
+  return {
+    imageUrl,
+    name: match.title || firstNamed.name,
   };
 }
 
@@ -184,6 +216,7 @@ export function ShippingTrackerClient({
         {
           id: created.id,
           products,
+          campaignProducts: null,
           status,
           carrier: carrier || null,
           trackingNumber: trackingNumber || null,
@@ -379,7 +412,7 @@ export function ShippingTrackerClient({
                       (s.influencerName ??
                         `${s.userFirstName ?? ""} ${s.userLastName ?? ""}`.trim()) ||
                       s.userEmail;
-                    const hero = getProductHero(s.products);
+                    const hero = getProductHero(s.products) ?? getCampaignHeroFromTitle(s.products, s.campaignProducts);
                     return (
                       <TableRow key={s.id}>
                         <TableCell className="align-top">

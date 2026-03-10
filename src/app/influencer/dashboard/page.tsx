@@ -53,6 +53,8 @@ export default async function InfluencerDashboardPage() {
         campaignId: campaigns.id,
         campaignStatus: campaigns.status,
         contentDueDate: campaignInfluencers.contentDueDate,
+        briefUrl: campaigns.briefUrl,
+        briefShareToken: campaigns.briefShareToken,
       })
       .from(campaignInfluencers)
       .innerJoin(campaigns, eq(campaignInfluencers.campaignId, campaigns.id))
@@ -149,21 +151,37 @@ export default async function InfluencerDashboardPage() {
         ) : (
           <div className="space-y-3">
             {activeCampaigns.map((c) => (
-              <Link key={c.id} href={`/influencer/campaigns/${c.campaignId}`}>
-                <Card className="border border-gray-200 shadow-sm hover:shadow-md hover:border-rose-200 transition-all cursor-pointer">
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div>
-                      <p className="font-semibold text-gray-900">{c.campaignTitle}</p>
-                      {c.contentDueDate && (
-                        <p className="text-xs text-gray-400">
-                          Due {formatDistanceToNow(new Date(c.contentDueDate), { addSuffix: true })}
-                        </p>
+              <Card key={c.id} className="border border-gray-200 shadow-sm hover:shadow-md hover:border-rose-200 transition-all">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-semibold text-gray-900">{c.campaignTitle}</p>
+                    {c.contentDueDate && (
+                      <p className="text-xs text-gray-400">
+                        Due {formatDistanceToNow(new Date(c.contentDueDate), { addSuffix: true })}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link href={`/influencer/campaigns/${c.campaignId}`}>
+                        <Button size="sm" className="h-8 bg-rose-600 px-3 text-xs hover:bg-rose-700">
+                          Open Campaign
+                        </Button>
+                      </Link>
+                      {(c.briefShareToken || c.briefUrl) && (
+                        <Link
+                          href={c.briefShareToken ? `/brief/${c.briefShareToken}` : (c.briefUrl as string)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                            View Brief
+                          </Button>
+                        </Link>
                       )}
                     </div>
-                    <StatusBadge status={c.status} />
-                  </CardContent>
-                </Card>
-              </Link>
+                  </div>
+                  <StatusBadge status={c.status} />
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}

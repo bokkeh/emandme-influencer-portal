@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { influencerProfiles, shipments, users } from "@/lib/db/schema";
+import { campaigns, influencerProfiles, shipments, users } from "@/lib/db/schema";
 import { ShippingTrackerClient } from "@/components/admin/ShippingTrackerClient";
 
 export default async function ShippingPage() {
@@ -18,6 +18,7 @@ export default async function ShippingPage() {
         deliveredAt: shipments.deliveredAt,
         notes: shipments.notes,
         createdAt: shipments.createdAt,
+        campaignProducts: campaigns.products,
         influencerName: influencerProfiles.displayName,
         influencerId: influencerProfiles.id,
         userEmail: users.email,
@@ -27,6 +28,7 @@ export default async function ShippingPage() {
       .from(shipments)
       .innerJoin(influencerProfiles, eq(shipments.influencerProfileId, influencerProfiles.id))
       .innerJoin(users, eq(influencerProfiles.userId, users.id))
+      .leftJoin(campaigns, eq(shipments.campaignId, campaigns.id))
       .orderBy(desc(shipments.createdAt)),
     db
       .select({

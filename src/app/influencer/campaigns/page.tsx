@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PlatformBadge } from "@/components/shared/PlatformBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Megaphone } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 
 export default async function InfluencerCampaignsPage() {
@@ -47,6 +48,8 @@ export default async function InfluencerCampaignsPage() {
       campaignPlatforms: campaigns.platforms,
       startDate: campaigns.startDate,
       endDate: campaigns.endDate,
+      briefUrl: campaigns.briefUrl,
+      briefShareToken: campaigns.briefShareToken,
     })
     .from(campaignInfluencers)
     .innerJoin(campaigns, eq(campaignInfluencers.campaignId, campaigns.id))
@@ -75,6 +78,10 @@ export default async function InfluencerCampaignsPage() {
         <div className="space-y-4">
           {myCampaigns.map((campaign) => {
             const isPendingApproval = campaign.status === "invited";
+            const briefHref =
+              campaign.briefShareToken
+                ? `/brief/${campaign.briefShareToken}`
+                : campaign.briefUrl?.trim() || null;
             const dateLabel = campaign.startDate
               ? campaign.endDate
                 ? `${format(new Date(campaign.startDate), "MMM d")} - ${format(new Date(campaign.endDate), "MMM d, yyyy")}`
@@ -84,7 +91,7 @@ export default async function InfluencerCampaignsPage() {
             const card = (
               <Card
                 className={`border border-gray-200 shadow-sm transition-all ${
-                  isPendingApproval ? "bg-amber-50/40" : "hover:shadow-md hover:border-rose-200 cursor-pointer"
+                  isPendingApproval ? "bg-amber-50/40" : "hover:shadow-md hover:border-rose-200"
                 }`}
               >
                 <CardContent className="p-5">
@@ -149,19 +156,27 @@ export default async function InfluencerCampaignsPage() {
                       </div>
                     ) : null}
                   </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {!isPendingApproval ? (
+                      <Link href={`/influencer/campaigns/${campaign.campaignId}`}>
+                        <Button size="sm" className="bg-rose-600 hover:bg-rose-700">
+                          Open Campaign
+                        </Button>
+                      </Link>
+                    ) : null}
+                    {briefHref ? (
+                      <Link href={briefHref} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline">
+                          View Brief
+                        </Button>
+                      </Link>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
             );
 
-            if (isPendingApproval) {
-              return <div key={campaign.enrollmentId}>{card}</div>;
-            }
-
-            return (
-              <Link key={campaign.enrollmentId} href={`/influencer/campaigns/${campaign.campaignId}`}>
-                {card}
-              </Link>
-            );
+            return <div key={campaign.enrollmentId}>{card}</div>;
           })}
         </div>
       )}
