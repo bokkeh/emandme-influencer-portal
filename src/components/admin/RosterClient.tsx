@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  Columns3,
   Download,
   ExternalLink,
   FileUp,
@@ -76,6 +79,24 @@ type ColumnSortKey =
   | "lastContactedAt"
   | "tags";
 type ColumnSortState = { key: ColumnSortKey; direction: SortDirection };
+type RosterColumnId =
+  | "fullName"
+  | "handle"
+  | "platform"
+  | "creatorType"
+  | "profileUrl"
+  | "portfolioUrl"
+  | "niche"
+  | "location"
+  | "followerCount"
+  | "engagementRate"
+  | "email"
+  | "manager"
+  | "status"
+  | "internalNotes"
+  | "lastContactedAt"
+  | "tags"
+  | "stripePayoutStatus";
 
 type RosterForm = {
   fullName: string;
@@ -113,6 +134,68 @@ type RosterForm = {
 };
 
 const FILTER_STORAGE_KEY = "admin-roster-filters-v1";
+const ROSTER_VIEWS_STORAGE_KEY = "admin-roster-views-v1";
+
+const DEFAULT_COLUMN_ORDER: RosterColumnId[] = [
+  "fullName",
+  "handle",
+  "platform",
+  "creatorType",
+  "profileUrl",
+  "portfolioUrl",
+  "niche",
+  "location",
+  "followerCount",
+  "engagementRate",
+  "email",
+  "manager",
+  "status",
+  "internalNotes",
+  "lastContactedAt",
+  "tags",
+  "stripePayoutStatus",
+];
+
+const COLUMN_LABELS: Record<RosterColumnId, string> = {
+  fullName: "Name",
+  handle: "Handle",
+  platform: "Platform",
+  creatorType: "Creator Type",
+  profileUrl: "Profile URL",
+  portfolioUrl: "Portfolio",
+  niche: "Niche",
+  location: "Location",
+  followerCount: "Followers",
+  engagementRate: "Engagement",
+  email: "Email",
+  manager: "Manager",
+  status: "Status",
+  internalNotes: "Notes",
+  lastContactedAt: "Last Contacted",
+  tags: "Tags",
+  stripePayoutStatus: "Stripe",
+};
+
+const SORTABLE_BY_COLUMN: Partial<Record<RosterColumnId, ColumnSortKey>> = {
+  fullName: "fullName",
+  handle: "handle",
+  platform: "platform",
+  niche: "niche",
+  location: "location",
+  followerCount: "followerCount",
+  engagementRate: "engagementRate",
+  email: "email",
+  manager: "manager",
+  status: "status",
+  lastContactedAt: "lastContactedAt",
+  tags: "tags",
+};
+
+type RosterViewPreset = {
+  name: string;
+  columnOrder: RosterColumnId[];
+  visibleColumns: RosterColumnId[];
+};
 
 const STATUS_STYLES: Record<RosterStatus, string> = {
   prospect: "bg-slate-100 text-slate-700 border-slate-300",
@@ -450,6 +533,19 @@ export function RosterClient({
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortKey>("contacted_desc");
   const [columnSort, setColumnSort] = useState<ColumnSortState>(presetToColumnSort("contacted_desc"));
+  const [columnOrder, setColumnOrder] = useState<RosterColumnId[]>(DEFAULT_COLUMN_ORDER);
+  const [visibleColumns, setVisibleColumns] = useState<Record<RosterColumnId, boolean>>(
+    DEFAULT_COLUMN_ORDER.reduce(
+      (acc, id) => {
+        acc[id] = true;
+        return acc;
+      },
+      {} as Record<RosterColumnId, boolean>
+    )
+  );
+  const [viewPresets, setViewPresets] = useState<RosterViewPreset[]>([]);
+  const [selectedViewName, setSelectedViewName] = useState<string>("default");
+  const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<InfluencerProfile | null>(null);
@@ -502,6 +598,9 @@ export function RosterClient({
         tagFilter?: string;
         sortBy?: SortKey;
         columnSort?: ColumnSortState;
+        columnOrder?: RosterColumnId[];
+        visibleColumns?: Partial<Record<RosterColumnId, boolean>>;
+        selectedViewName?: string;
       };
       setQuery(parsed.query ?? "");
       setPlatformFilter(parsed.platformFilter ?? "all");
@@ -519,10 +618,74 @@ export function RosterClient({
       } else {
         setColumnSort(presetToColumnSort(preset));
       }
+      if (Array.isArray(parsed.columnOrder) && parsed.columnOrder.length > 0) {
+        const safe = parsed.columnOrder.filter((col): col is RosterColumnId =>
+          DEFAULT_COLUMN_ORDER.includes(col as RosterColumnId)
+        );
+        if (safe.length > 0) {
+          const missing = DEFAULT_COLUMN_ORDER.filter((col) => !safe.includes(col));
+          setColumnOrder([...safe, ...missing]);
+        }
+      }
+      if (parsed.visibleColumns) {
+        const merged = DEFAULT_COLUMN_ORDER.reduce(
+          (acc, col) => {
+            acc[col] = parsed.visibleColumns?.[col] ?? true;
+            return acc;
+          },
+          {} as Record<RosterColumnId, boolean>
+        );
+        setVisibleColumns(merged);
+      }
+      if (parsed.selectedViewName) setSelectedViewName(parsed.selectedViewName);
     } catch {
       // no-op
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ROSTER_VIEWS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as RosterViewPreset[];
+      if (!Array.isArray(parsed)) return;
+      const normalized = parsed
+        .filter((preset) => preset?.name && Array.isArray(preset.columnOrder) && Array.isArray(preset.visibleColumns))
+        .map((preset) => {
+          const order = preset.columnOrder.filter((col): col is RosterColumnId =>
+            DEFAULT_COLUMN_ORDER.includes(col as RosterColumnId)
+          );
+          const missing = DEFAULT_COLUMN_ORDER.filter((col) => !order.includes(col));
+          const visible = preset.visibleColumns.filter((col): col is RosterColumnId =>
+            DEFAULT_COLUMN_ORDER.includes(col as RosterColumnId)
+          );
+          return {
+            name: preset.name,
+            columnOrder: [...order, ...missing],
+            visibleColumns: visible,
+          };
+        });
+      setViewPresets(normalized);
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedViewName === "default") return;
+    const preset = viewPresets.find((item) => item.name === selectedViewName);
+    if (!preset) return;
+    setColumnOrder(preset.columnOrder);
+    setVisibleColumns(
+      DEFAULT_COLUMN_ORDER.reduce(
+        (acc, id) => {
+          acc[id] = preset.visibleColumns.includes(id);
+          return acc;
+        },
+        {} as Record<RosterColumnId, boolean>
+      )
+    );
+  }, [viewPresets, selectedViewName]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -535,9 +698,27 @@ export function RosterClient({
         tagFilter,
         sortBy,
         columnSort,
+        columnOrder,
+        visibleColumns,
+        selectedViewName,
       })
     );
-  }, [query, platformFilter, statusFilter, locationFilter, tagFilter, sortBy, columnSort]);
+  }, [
+    query,
+    platformFilter,
+    statusFilter,
+    locationFilter,
+    tagFilter,
+    sortBy,
+    columnSort,
+    columnOrder,
+    visibleColumns,
+    selectedViewName,
+  ]);
+
+  useEffect(() => {
+    localStorage.setItem(ROSTER_VIEWS_STORAGE_KEY, JSON.stringify(viewPresets));
+  }, [viewPresets]);
 
   async function loadRoster() {
     setLoading(true);
@@ -617,6 +798,87 @@ export function RosterClient({
   function sortIndicator(key: ColumnSortKey) {
     if (columnSort.key !== key) return <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />;
     return <span className="text-xs">{columnSort.direction === "asc" ? "▲" : "▼"}</span>;
+  }
+
+  const shownColumns = useMemo(
+    () => columnOrder.filter((id) => visibleColumns[id]),
+    [columnOrder, visibleColumns]
+  );
+
+  function toggleColumnVisibility(column: RosterColumnId) {
+    setVisibleColumns((prev) => {
+      const next = { ...prev, [column]: !prev[column] };
+      if (!Object.values(next).some(Boolean)) next.fullName = true;
+      return next;
+    });
+  }
+
+  function moveColumn(column: RosterColumnId, direction: "up" | "down") {
+    setColumnOrder((prev) => {
+      const idx = prev.indexOf(column);
+      if (idx === -1) return prev;
+      const target = direction === "up" ? idx - 1 : idx + 1;
+      if (target < 0 || target >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[idx], copy[target]] = [copy[target], copy[idx]];
+      return copy;
+    });
+  }
+
+  function applyViewPreset(name: string) {
+    if (name === "default") {
+      setColumnOrder(DEFAULT_COLUMN_ORDER);
+      setVisibleColumns(
+        DEFAULT_COLUMN_ORDER.reduce(
+          (acc, id) => {
+            acc[id] = true;
+            return acc;
+          },
+          {} as Record<RosterColumnId, boolean>
+        )
+      );
+      setSelectedViewName("default");
+      return;
+    }
+    const preset = viewPresets.find((item) => item.name === name);
+    if (!preset) return;
+    setColumnOrder(preset.columnOrder);
+    setVisibleColumns(
+      DEFAULT_COLUMN_ORDER.reduce(
+        (acc, id) => {
+          acc[id] = preset.visibleColumns.includes(id);
+          return acc;
+        },
+        {} as Record<RosterColumnId, boolean>
+      )
+    );
+    setSelectedViewName(name);
+  }
+
+  function saveCurrentAsPreset() {
+    const name = window.prompt("Name this roster view preset:");
+    if (!name?.trim()) return;
+    const trimmed = name.trim();
+    const preset: RosterViewPreset = {
+      name: trimmed,
+      columnOrder,
+      visibleColumns: DEFAULT_COLUMN_ORDER.filter((id) => visibleColumns[id]),
+    };
+    setViewPresets((prev) => {
+      const withoutSame = prev.filter((item) => item.name !== trimmed);
+      return [...withoutSame, preset].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    setSelectedViewName(trimmed);
+    toast.success("View preset saved");
+  }
+
+  function deleteCurrentPreset() {
+    if (selectedViewName === "default") return;
+    const confirmed = window.confirm(`Delete "${selectedViewName}" preset?`);
+    if (!confirmed) return;
+    setViewPresets((prev) => prev.filter((item) => item.name !== selectedViewName));
+    setSelectedViewName("default");
+    toast.success("View preset deleted");
   }
 
   function beginCellEdit(rowId: string, field: string, value: string) {
@@ -1044,6 +1306,342 @@ export function RosterClient({
     }
   }
 
+  function renderColumnHeader(columnId: RosterColumnId) {
+    const sortKey = SORTABLE_BY_COLUMN[columnId];
+    const label = COLUMN_LABELS[columnId];
+    if (!sortKey) return <span>{label}</span>;
+    return (
+      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort(sortKey)}>
+        {label} {sortIndicator(sortKey)}
+      </button>
+    );
+  }
+
+  function renderColumnCell(row: InfluencerProfile, columnId: RosterColumnId) {
+    switch (columnId) {
+      case "fullName":
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={row.avatarUrl ?? undefined} />
+              <AvatarFallback className="text-xs">{row.fullName.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            {editingCell?.rowId === row.id && editingCell.field === "fullName" ? (
+              <Input
+                autoFocus
+                className="h-8 w-[180px]"
+                value={editingValue}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setEditingValue(e.target.value)}
+                onBlur={() => void saveInlineCell(row, "fullName", editingValue)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveInlineCell(row, "fullName", editingValue);
+                  if (e.key === "Escape") cancelCellEdit();
+                }}
+              />
+            ) : (
+              <button
+                className="font-medium text-left hover:text-rose-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  beginCellEdit(row.id, "fullName", row.fullName);
+                }}
+              >
+                {row.fullName}
+              </button>
+            )}
+          </div>
+        );
+      case "handle":
+        return editingCell?.rowId === row.id && editingCell.field === "handle" ? (
+          <Input
+            autoFocus
+            className="h-8 w-[140px]"
+            value={editingValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => void saveInlineCell(row, "handle", editingValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveInlineCell(row, "handle", editingValue);
+              if (e.key === "Escape") cancelCellEdit();
+            }}
+          />
+        ) : (
+          <button
+            className="text-left hover:text-rose-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, "handle", row.handle ?? "");
+            }}
+          >
+            {row.handle ? `@${row.handle.replace(/^@/, "")}` : "-"}
+          </button>
+        );
+      case "platform":
+        return editingCell?.rowId === row.id && editingCell.field === "platform" ? (
+          <Select value={editingValue || row.platform} onValueChange={(value) => void saveInlineCell(row, "platform", value)}>
+            <SelectTrigger className="h-8 w-[130px]" onClick={(e) => e.stopPropagation()}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROSTER_PLATFORMS.map((platform) => (
+                <SelectItem key={`${row.id}-platform-${platform}`} value={platform}>
+                  {titleCase(platform)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <button
+            className="text-left hover:text-rose-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, "platform", row.platform);
+            }}
+          >
+            {titleCase(row.platform)}
+          </button>
+        );
+      case "creatorType":
+        return (
+          <Badge variant="outline" className="text-[11px]">
+            {row.creatorType === "ugc_creator" ? "UGC Creator" : "Influencer"}
+          </Badge>
+        );
+      case "profileUrl": {
+        const linkEntries = parseProfileLinkEntries(row.profileUrl);
+        if (linkEntries.length === 0) return <span>-</span>;
+        return (
+          <Select
+            value={profileUrlSelection[row.id] ?? ""}
+            onValueChange={(value) => {
+              setProfileUrlSelection((prev) => ({ ...prev, [row.id]: value }));
+              openExternalUrl(value);
+              setProfileUrlSelection((prev) => ({ ...prev, [row.id]: "" }));
+            }}
+          >
+            <SelectTrigger className="h-8 w-[190px] text-xs" onClick={(e) => e.stopPropagation()}>
+              <SelectValue placeholder={`Open (${linkEntries.length})`} />
+            </SelectTrigger>
+            <SelectContent onClick={(e) => e.stopPropagation()}>
+              {linkEntries.map((entry, idx) => (
+                <SelectItem key={`${row.id}-profile-url-${idx}`} value={entry.url}>
+                  {`${titleCase(entry.platform)} - ${entry.url.replace(/^https?:\/\//i, "")}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      }
+      case "portfolioUrl":
+        return editingCell?.rowId === row.id && editingCell.field === "portfolioUrl" ? (
+          <Input
+            autoFocus
+            className="h-8 w-[220px]"
+            value={editingValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => void saveInlineCell(row, "portfolioUrl", editingValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveInlineCell(row, "portfolioUrl", editingValue);
+              if (e.key === "Escape") cancelCellEdit();
+            }}
+          />
+        ) : row.portfolioUrl ? (
+          <button
+            className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              openExternalUrl(row.portfolioUrl ?? "");
+            }}
+          >
+            Open
+          </button>
+        ) : (
+          <span>-</span>
+        );
+      case "niche":
+      case "location":
+      case "manager":
+      case "internalNotes":
+      case "email": {
+        const widthClass =
+          columnId === "email" || columnId === "internalNotes"
+            ? "w-[170px]"
+            : columnId === "manager"
+              ? "w-[130px]"
+              : "w-[120px]";
+        const value = row[columnId] ?? "";
+        return editingCell?.rowId === row.id && editingCell.field === columnId ? (
+          <Input
+            autoFocus
+            className={`h-8 ${widthClass}`}
+            value={editingValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => void saveInlineCell(row, columnId, editingValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveInlineCell(row, columnId, editingValue);
+              if (e.key === "Escape") cancelCellEdit();
+            }}
+          />
+        ) : (
+          <button
+            className="text-left hover:text-rose-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, columnId, String(value));
+            }}
+          >
+            {value || "-"}
+          </button>
+        );
+      }
+      case "followerCount":
+      case "engagementRate": {
+        const value = columnId === "followerCount" ? String(row.followerCount ?? 0) : row.engagementRate !== null ? String(row.engagementRate) : "";
+        return editingCell?.rowId === row.id && editingCell.field === columnId ? (
+          <Input
+            autoFocus
+            type="number"
+            step={columnId === "engagementRate" ? "0.01" : undefined}
+            className={columnId === "engagementRate" ? "h-8 w-[95px]" : "h-8 w-[100px]"}
+            value={editingValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => void saveInlineCell(row, columnId, editingValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveInlineCell(row, columnId, editingValue);
+              if (e.key === "Escape") cancelCellEdit();
+            }}
+          />
+        ) : (
+          <button
+            className="text-left hover:text-rose-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, columnId, value);
+            }}
+          >
+            {columnId === "engagementRate"
+              ? row.engagementRate !== null
+                ? `${row.engagementRate}%`
+                : "-"
+              : row.followerCount
+                ? row.followerCount.toLocaleString()
+                : "-"}
+          </button>
+        );
+      }
+      case "status":
+        return editingCell?.rowId === row.id && editingCell.field === "status" ? (
+          <Select value={editingValue || row.status} onValueChange={(value) => void saveInlineCell(row, "status", value)}>
+            <SelectTrigger className="h-8 w-[135px]" onClick={(e) => e.stopPropagation()}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROSTER_STATUSES.map((status) => (
+                <SelectItem key={`${row.id}-status-${status}`} value={status}>
+                  {titleCase(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, "status", row.status);
+            }}
+          >
+            <Badge variant="outline" className={STATUS_STYLES[row.status]}>
+              {titleCase(row.status)}
+            </Badge>
+          </button>
+        );
+      case "lastContactedAt":
+        return editingCell?.rowId === row.id && editingCell.field === "lastContactedAt" ? (
+          <Input
+            autoFocus
+            type="date"
+            className="h-8 w-[150px]"
+            value={editingValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => void saveInlineCell(row, "lastContactedAt", editingValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveInlineCell(row, "lastContactedAt", editingValue);
+              if (e.key === "Escape") cancelCellEdit();
+            }}
+          />
+        ) : (
+          <button
+            className="text-left hover:text-rose-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, "lastContactedAt", row.lastContactedAt ? row.lastContactedAt.slice(0, 10) : "");
+            }}
+          >
+            {row.lastContactedAt ? format(new Date(row.lastContactedAt), "MMM d, yyyy") : "-"}
+          </button>
+        );
+      case "tags":
+        return editingCell?.rowId === row.id && editingCell.field === "tags" ? (
+          <Input
+            autoFocus
+            className="h-8 w-[170px]"
+            value={editingValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => void saveInlineCell(row, "tags", editingValue)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveInlineCell(row, "tags", editingValue);
+              if (e.key === "Escape") cancelCellEdit();
+            }}
+          />
+        ) : (
+          <button
+            className="text-left hover:text-rose-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              beginCellEdit(row.id, "tags", row.tags.join(", "));
+            }}
+          >
+            <div className="flex flex-wrap gap-1">
+              {row.tags.length === 0 ? (
+                <span>-</span>
+              ) : (
+                row.tags.slice(0, 2).map((tag) => (
+                  <Badge key={`${row.id}-${tag}`} variant="outline" className="text-[10px]">
+                    {tag}
+                  </Badge>
+                ))
+              )}
+              {row.tags.length > 2 && (
+                <Badge variant="outline" className="text-[10px]">
+                  +{row.tags.length - 2}
+                </Badge>
+              )}
+            </div>
+          </button>
+        );
+      case "stripePayoutStatus":
+        return row.stripePayoutStatus === "active" ? (
+          <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100 text-[10px]">Connected</Badge>
+        ) : row.stripePayoutStatus === "pending" ? (
+          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 text-[10px]">Pending</Badge>
+        ) : row.stripePayoutStatus === "restricted" ? (
+          <Badge className="bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100 text-[10px]">Restricted</Badge>
+        ) : row.stripePayoutStatus === "disabled" ? (
+          <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100 text-[10px]">Disabled</Badge>
+        ) : (
+          <Badge className="bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100 text-[10px]">Not set</Badge>
+        );
+      default:
+        return <span>-</span>;
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
@@ -1168,6 +1766,48 @@ export function RosterClient({
               </SelectContent>
             </Select>
           </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Select
+              value={selectedViewName}
+              onValueChange={(value) => {
+                applyViewPreset(value);
+              }}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="View preset" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default view</SelectItem>
+                {viewPresets.map((preset) => (
+                  <SelectItem key={preset.name} value={preset.name}>
+                    {preset.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="outline" size="sm" onClick={saveCurrentAsPreset}>
+              Save as preset
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={deleteCurrentPreset}
+              disabled={selectedViewName === "default"}
+            >
+              Delete preset
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setColumnsDialogOpen(true)}
+            >
+              <Columns3 className="h-4 w-4" />
+              Columns
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -1193,71 +1833,9 @@ export function RosterClient({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("fullName")}>
-                        Name {sortIndicator("fullName")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("handle")}>
-                        Handle {sortIndicator("handle")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("platform")}>
-                        Platform {sortIndicator("platform")}
-                      </button>
-                    </TableHead>
-                    <TableHead>Creator Type</TableHead>
-                    <TableHead>Profile URL</TableHead>
-                    <TableHead>Portfolio</TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("niche")}>
-                        Niche {sortIndicator("niche")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("location")}>
-                        Location {sortIndicator("location")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("followerCount")}>
-                        Followers {sortIndicator("followerCount")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("engagementRate")}>
-                        Engagement {sortIndicator("engagementRate")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("email")}>
-                        Email {sortIndicator("email")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("manager")}>
-                        Manager {sortIndicator("manager")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("status")}>
-                        Status {sortIndicator("status")}
-                      </button>
-                    </TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("lastContactedAt")}>
-                        Last Contacted {sortIndicator("lastContactedAt")}
-                      </button>
-                    </TableHead>
-                    <TableHead>
-                      <button className="inline-flex items-center gap-1 hover:text-rose-700" onClick={() => toggleColumnSort("tags")}>
-                        Tags {sortIndicator("tags")}
-                      </button>
-                    </TableHead>
-                    <TableHead>Stripe</TableHead>
+                    {shownColumns.map((columnId) => (
+                      <TableHead key={`head-${columnId}`}>{renderColumnHeader(columnId)}</TableHead>
+                    ))}
                     <TableHead className="text-right">Quick Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1268,461 +1846,21 @@ export function RosterClient({
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => setSelectedId(row.id)}
                     >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={row.avatarUrl ?? undefined} />
-                            <AvatarFallback className="text-xs">
-                              {row.fullName.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {editingCell?.rowId === row.id && editingCell.field === "fullName" ? (
-                            <Input
-                              autoFocus
-                              className="h-8 w-[180px]"
-                              value={editingValue}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onBlur={() => void saveInlineCell(row, "fullName", editingValue)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") void saveInlineCell(row, "fullName", editingValue);
-                                if (e.key === "Escape") cancelCellEdit();
-                              }}
-                            />
-                          ) : (
-                            <button
-                              className="font-medium text-left hover:text-rose-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                beginCellEdit(row.id, "fullName", row.fullName);
-                              }}
-                            >
-                              {row.fullName}
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "handle" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[140px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "handle", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "handle", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "handle", row.handle ?? "");
-                            }}
-                          >
-                            {row.handle ? `@${row.handle.replace(/^@/, "")}` : "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "platform" ? (
-                          <Select
-                            value={editingValue || row.platform}
-                            onValueChange={(value) => void saveInlineCell(row, "platform", value)}
-                          >
-                            <SelectTrigger className="h-8 w-[130px]" onClick={(e) => e.stopPropagation()}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ROSTER_PLATFORMS.map((platform) => (
-                                <SelectItem key={`${row.id}-platform-${platform}`} value={platform}>
-                                  {titleCase(platform)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "platform", row.platform);
-                            }}
-                          >
-                            {titleCase(row.platform)}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[11px]">
-                          {row.creatorType === "ugc_creator" ? "UGC Creator" : "Influencer"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const linkEntries = parseProfileLinkEntries(row.profileUrl);
-                          if (linkEntries.length === 0) return <span>-</span>;
-                          return (
-                            <Select
-                              value={profileUrlSelection[row.id] ?? ""}
-                              onValueChange={(value) => {
-                                setProfileUrlSelection((prev) => ({ ...prev, [row.id]: value }));
-                                openExternalUrl(value);
-                                setProfileUrlSelection((prev) => ({ ...prev, [row.id]: "" }));
-                              }}
-                            >
-                              <SelectTrigger className="h-8 w-[190px] text-xs" onClick={(e) => e.stopPropagation()}>
-                                <SelectValue placeholder={`Open (${linkEntries.length})`} />
-                              </SelectTrigger>
-                              <SelectContent onClick={(e) => e.stopPropagation()}>
-                                {linkEntries.map((entry, idx) => (
-                                  <SelectItem key={`${row.id}-profile-url-${idx}`} value={entry.url}>
-                                    {`${titleCase(entry.platform)} - ${entry.url.replace(/^https?:\/\//i, "")}`}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "portfolioUrl" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[220px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "portfolioUrl", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "portfolioUrl", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          row.portfolioUrl ? (
-                            <button
-                              className="text-left text-rose-600 hover:text-rose-700 text-xs underline underline-offset-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openExternalUrl(row.portfolioUrl ?? "");
-                              }}
-                            >
-                              Open
-                            </button>
-                          ) : (
-                            <span>-</span>
-                          )
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "niche" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[120px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "niche", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "niche", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "niche", row.niche ?? "");
-                            }}
-                          >
-                            {row.niche ?? "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "location" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[120px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "location", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "location", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "location", row.location ?? "");
-                            }}
-                          >
-                            {row.location ?? "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "followerCount" ? (
-                          <Input
-                            autoFocus
-                            type="number"
-                            className="h-8 w-[100px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "followerCount", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "followerCount", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "followerCount", String(row.followerCount ?? 0));
-                            }}
-                          >
-                            {row.followerCount ? row.followerCount.toLocaleString() : "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "engagementRate" ? (
-                          <Input
-                            autoFocus
-                            type="number"
-                            step="0.01"
-                            className="h-8 w-[95px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "engagementRate", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "engagementRate", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(
-                                row.id,
-                                "engagementRate",
-                                row.engagementRate !== null ? String(row.engagementRate) : ""
-                              );
-                            }}
-                          >
-                            {row.engagementRate !== null ? `${row.engagementRate}%` : "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[180px] truncate">
-                        {editingCell?.rowId === row.id && editingCell.field === "email" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[170px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "email", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "email", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "email", row.email ?? "");
-                            }}
-                          >
-                            {row.email ?? "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "manager" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[130px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "manager", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "manager", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "manager", row.manager ?? "");
-                            }}
-                          >
-                            {row.manager ?? "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "status" ? (
-                          <Select
-                            value={editingValue || row.status}
-                            onValueChange={(value) => void saveInlineCell(row, "status", value)}
-                          >
-                            <SelectTrigger className="h-8 w-[135px]" onClick={(e) => e.stopPropagation()}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ROSTER_STATUSES.map((status) => (
-                                <SelectItem key={`${row.id}-status-${status}`} value={status}>
-                                  {titleCase(status)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "status", row.status);
-                            }}
-                          >
-                            <Badge variant="outline" className={STATUS_STYLES[row.status]}>
-                              {titleCase(row.status)}
-                            </Badge>
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[180px] truncate">
-                        {editingCell?.rowId === row.id && editingCell.field === "internalNotes" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[170px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "internalNotes", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "internalNotes", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "internalNotes", row.internalNotes ?? "");
-                            }}
-                          >
-                            {row.internalNotes ?? "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingCell?.rowId === row.id && editingCell.field === "lastContactedAt" ? (
-                          <Input
-                            autoFocus
-                            type="date"
-                            className="h-8 w-[150px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "lastContactedAt", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "lastContactedAt", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(
-                                row.id,
-                                "lastContactedAt",
-                                row.lastContactedAt ? row.lastContactedAt.slice(0, 10) : ""
-                              );
-                            }}
-                          >
-                            {row.lastContactedAt ? format(new Date(row.lastContactedAt), "MMM d, yyyy") : "-"}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        {editingCell?.rowId === row.id && editingCell.field === "tags" ? (
-                          <Input
-                            autoFocus
-                            className="h-8 w-[170px]"
-                            value={editingValue}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={() => void saveInlineCell(row, "tags", editingValue)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void saveInlineCell(row, "tags", editingValue);
-                              if (e.key === "Escape") cancelCellEdit();
-                            }}
-                          />
-                        ) : (
-                          <button
-                            className="text-left hover:text-rose-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              beginCellEdit(row.id, "tags", row.tags.join(", "));
-                            }}
-                          >
-                            <div className="flex flex-wrap gap-1">
-                              {row.tags.length === 0 ? (
-                                <span>-</span>
-                              ) : (
-                                row.tags.slice(0, 2).map((tag) => (
-                                  <Badge key={`${row.id}-${tag}`} variant="outline" className="text-[10px]">
-                                    {tag}
-                                  </Badge>
-                                ))
-                              )}
-                              {row.tags.length > 2 && (
-                                <Badge variant="outline" className="text-[10px]">
-                                  +{row.tags.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        {row.stripePayoutStatus === "active" ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-100 text-[10px]">Connected</Badge>
-                        ) : row.stripePayoutStatus === "pending" ? (
-                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100 text-[10px]">Pending</Badge>
-                        ) : row.stripePayoutStatus === "restricted" ? (
-                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100 text-[10px]">Restricted</Badge>
-                        ) : row.stripePayoutStatus === "disabled" ? (
-                          <Badge className="bg-red-100 text-red-800 border-red-200 hover:bg-red-100 text-[10px]">Disabled</Badge>
-                        ) : (
-                          <Badge className="bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-100 text-[10px]">Not set</Badge>
-                        )}
-                      </TableCell>
+                      {shownColumns.map((columnId) => (
+                        <TableCell
+                          key={`${row.id}-${columnId}`}
+                          onClick={columnId === "stripePayoutStatus" ? (e) => e.stopPropagation() : undefined}
+                          className={
+                            columnId === "email" || columnId === "internalNotes"
+                              ? "max-w-[180px] truncate"
+                              : columnId === "tags"
+                                ? "max-w-[180px]"
+                                : undefined
+                          }
+                        >
+                          {renderColumnCell(row, columnId)}
+                        </TableCell>
+                      ))}
                       <TableCell>
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Select value={row.status} onValueChange={(value) => updateStatus(row, value as RosterStatus)}>
@@ -1780,6 +1918,58 @@ export function RosterClient({
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={columnsDialogOpen} onOpenChange={setColumnsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Customize Columns</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              Toggle visibility and reorder columns. This layout can be saved as a preset.
+            </p>
+            <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              {columnOrder.map((columnId, index) => (
+                <div
+                  key={columnId}
+                  className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2"
+                >
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns[columnId]}
+                      onChange={() => toggleColumnVisibility(columnId)}
+                    />
+                    {COLUMN_LABELS[columnId]}
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={index === 0}
+                      onClick={() => moveColumn(columnId, "up")}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={index === columnOrder.length - 1}
+                      onClick={() => moveColumn(columnId, "down")}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl">
