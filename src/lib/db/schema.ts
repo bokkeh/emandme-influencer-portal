@@ -23,6 +23,7 @@ export const userRoleEnum = pgEnum("user_role", [
   "influencer",
   "ugc_creator",
   "affiliate",
+  "test_account",
 ]);
 
 export const influencerTierEnum = pgEnum("influencer_tier", [

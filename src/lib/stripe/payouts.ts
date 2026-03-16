@@ -1,6 +1,8 @@
 import { assertStripeConfigured, stripe } from "./client";
-import { db, payments, influencerProfiles } from "@/lib/db";
+import { db, payments, influencerProfiles, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { sendEmail } from "@/lib/email";
+import { paymentSentEmailHtml } from "@/lib/email/templates";
 
 export async function triggerInfluencerPayout(paymentId: string) {
   assertStripeConfigured();
@@ -14,12 +16,12 @@ export async function triggerInfluencerPayout(paymentId: string) {
       description: payments.description,
       stripeAccountId: influencerProfiles.stripeAccountId,
       stripePayoutsEnabled: influencerProfiles.stripePayoutsEnabled,
+      userEmail: users.email,
+      userFirstName: users.firstName,
     })
     .from(payments)
-    .innerJoin(
-      influencerProfiles,
-      eq(payments.influencerProfileId, influencerProfiles.id)
-    )
+    .innerJoin(influencerProfiles, eq(payments.influencerProfileId, influencerProfiles.id))
+    .innerJoin(users, eq(influencerProfiles.userId, users.id))
     .where(eq(payments.id, paymentId))
     .limit(1);
 
@@ -46,6 +48,18 @@ export async function triggerInfluencerPayout(paymentId: string) {
       paidAt: new Date(),
     })
     .where(eq(payments.id, paymentId));
+
+  // Send payment confirmation email (fire-and-forget)
+  sendEmail({
+    to: payment.userEmail,
+    subject: "Your payment from Em & Me Studio",
+    html: paymentSentEmailHtml({
+      firstName: payment.userFirstName,
+      amount: amountInCents,
+      currency: payment.currency,
+      description: payment.description,
+    }),
+  }).catch(console.error);
 
   return transfer;
 }

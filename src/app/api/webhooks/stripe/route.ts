@@ -3,6 +3,8 @@ import { stripe } from "@/lib/stripe/client";
 import { db, influencerProfiles, payments, users } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { googleChat } from "@/lib/notifications/google-chat";
+import { sendEmail } from "@/lib/email";
+import { paymentFailedEmailHtml } from "@/lib/email/templates";
 
 export async function POST(req: Request) {
   const sig = (await headers()).get("stripe-signature");
@@ -67,6 +69,19 @@ export async function POST(req: Request) {
         String((transfer.amount ?? 0) / 100),
         transfer.failure_message ?? undefined
       );
+
+      if (payment?.userEmail) {
+        sendEmail({
+          to: payment.userEmail,
+          subject: "Payment issue — action required",
+          html: paymentFailedEmailHtml({
+            firstName: payment.userFirstName,
+            amount: transfer.amount ?? 0,
+            currency: "usd",
+            reason: transfer.failure_message ?? null,
+          }),
+        }).catch(console.error);
+      }
     }
   }
 

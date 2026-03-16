@@ -22,6 +22,8 @@ export default async function RootPage() {
 
   if (user.role === "admin") {
     redirect("/admin/dashboard");
+  } else if (user.role === "test_account") {
+    redirect("/ad-library-scraper");
   } else {
     redirect("/influencer/dashboard");
   }

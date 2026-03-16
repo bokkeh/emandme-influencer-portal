@@ -1,7 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { and, eq, ne } from "drizzle-orm";
 import { db, users } from "@/lib/db";
+import type { UserRole } from "@/lib/auth";
 
 async function requireAdminApi() {
   const { userId, sessionClaims } = await auth();
@@ -31,7 +32,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = (await req.json()) as {
-      role?: "admin" | "influencer" | "ugc_creator" | "affiliate";
+      role?: UserRole;
       isActive?: boolean;
     };
 
@@ -46,6 +47,10 @@ export async function PATCH(
       .limit(1);
 
     if (!target) return new NextResponse("User not found", { status: 404 });
+
+    if (body.role && !["admin", "influencer", "ugc_creator", "affiliate", "test_account"].includes(body.role)) {
+      return new NextResponse("Invalid role", { status: 400 });
+    }
 
     // Prevent demoting the last active admin.
     if (target.role === "admin" && body.role && body.role !== "admin") {
@@ -78,6 +83,16 @@ export async function PATCH(
       });
 
     if (!updated) return new NextResponse("Failed to update user", { status: 500 });
+
+    try {
+      const clerk = await clerkClient();
+      await clerk.users.updateUserMetadata(target.clerkUserId, {
+        publicMetadata: body.role ? { role: body.role } : undefined,
+        privateMetadata: body.role ? { role: body.role } : undefined,
+      });
+    } catch {
+      // Keep DB as source of truth if Clerk metadata update is temporarily unavailable.
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

@@ -22,10 +22,12 @@ type TeamMember = {
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
-  role: "admin" | "influencer" | "ugc_creator" | "affiliate";
+  role: "admin" | "influencer" | "ugc_creator" | "affiliate" | "test_account";
   isActive: boolean;
   createdAt: string;
 };
+
+type NewUserRole = TeamMember["role"];
 
 function displayName(member: TeamMember) {
   const name = `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim();
@@ -43,6 +45,18 @@ export function TeamManagementClient() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
+  const [creating, setCreating] = useState(false);
+  const [newMember, setNewMember] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    role: "influencer" as NewUserRole,
+  });
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    email: string;
+    temporaryPassword: string;
+    role: NewUserRole;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -93,12 +107,117 @@ export function TeamManagementClient() {
     }
   }
 
+  async function createMember() {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/admin/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMember),
+      });
+
+      if (!res.ok) throw new Error((await res.text()) || "Failed to create user");
+
+      const payload = (await res.json()) as {
+        user: TeamMember;
+        temporaryPassword: string;
+      };
+
+      setMembers((prev) => [payload.user, ...prev].sort((a, b) => a.email.localeCompare(b.email)));
+      setCreatedCredentials({
+        email: payload.user.email,
+        temporaryPassword: payload.temporaryPassword,
+        role: payload.user.role,
+      });
+      setNewMember({
+        email: "",
+        firstName: "",
+        lastName: "",
+        role: "influencer",
+      });
+      toast.success(`Created ${payload.user.email}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create user";
+      toast.error(message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
-    <Card className="border border-gray-200 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-base">Team Members</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-6">
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Create Team User</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input
+              placeholder="Email address"
+              type="email"
+              value={newMember.email}
+              onChange={(e) => setNewMember((prev) => ({ ...prev, email: e.target.value }))}
+            />
+            <Select
+              value={newMember.role}
+              onValueChange={(value) =>
+                setNewMember((prev) => ({ ...prev, role: value as NewUserRole }))
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="influencer">Influencer</SelectItem>
+                <SelectItem value="ugc_creator">UGC Creator</SelectItem>
+                <SelectItem value="affiliate">Affiliate</SelectItem>
+                <SelectItem value="test_account">Test Account</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input
+              placeholder="First name"
+              value={newMember.firstName}
+              onChange={(e) => setNewMember((prev) => ({ ...prev, firstName: e.target.value }))}
+            />
+            <Input
+              placeholder="Last name"
+              value={newMember.lastName}
+              onChange={(e) => setNewMember((prev) => ({ ...prev, lastName: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="text-sm text-gray-600">
+              `test_account` only gets the Ad Library Scraper. Other roles follow normal portal access.
+            </div>
+            <Button
+              type="button"
+              className="bg-rose-600 hover:bg-rose-700"
+              disabled={creating || !newMember.email.trim()}
+              onClick={() => void createMember()}
+            >
+              {creating ? "Creating..." : "Create User"}
+            </Button>
+          </div>
+
+          {createdCredentials ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm">
+              <p className="font-semibold text-emerald-900">Temporary credentials</p>
+              <p className="mt-2 text-emerald-800">Email: {createdCredentials.email}</p>
+              <p className="text-emerald-800">Password: {createdCredentials.temporaryPassword}</p>
+              <p className="text-emerald-700">Role: {createdCredentials.role}</p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Team Members</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
         <Input
           placeholder="Search name, email, or role..."
           value={query}
@@ -160,6 +279,7 @@ export function TeamManagementClient() {
                           <SelectItem value="influencer">Influencer</SelectItem>
                           <SelectItem value="ugc_creator">UGC Creator</SelectItem>
                           <SelectItem value="affiliate">Affiliate</SelectItem>
+                          <SelectItem value="test_account">Test Account</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -203,7 +323,8 @@ export function TeamManagementClient() {
             })}
           </div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -1,7 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db, shipments, users } from "@/lib/db";
+import { db, shipments, users, influencerProfiles } from "@/lib/db";
+import { sendEmail } from "@/lib/email";
+import { shipmentShippedEmailHtml } from "@/lib/email/templates";
 
 type ShipmentProductInput = {
   name: string;
@@ -105,6 +107,39 @@ export async function PATCH(
       .returning({ id: shipments.id, status: shipments.status });
 
     if (!updated) return new NextResponse("Shipment not found", { status: 404 });
+
+    // Send shipment notification when status changes to shipped
+    if (body.status === "shipped") {
+      db.select({
+          email: users.email,
+          firstName: users.firstName,
+        })
+        .from(shipments)
+        .innerJoin(influencerProfiles, eq(shipments.influencerProfileId, influencerProfiles.id))
+        .innerJoin(users, eq(influencerProfiles.userId, users.id))
+        .where(eq(shipments.id, id))
+        .limit(1)
+        .then(([recipient]) => {
+          if (!recipient) return;
+          const products = Array.isArray(body.products)
+            ? (body.products as Array<{ name: string; qty: number }>)
+            : [];
+          return sendEmail({
+            to: recipient.email,
+            subject: "Your Em & Me Studio package has shipped",
+            html: shipmentShippedEmailHtml({
+              firstName: recipient.firstName,
+              products,
+              carrier: body.carrier ?? null,
+              trackingNumber: body.trackingNumber ?? null,
+              trackingUrl: body.trackingUrl ?? null,
+              estimatedDeliveryAt: body.estimatedDeliveryAt ? new Date(body.estimatedDeliveryAt) : null,
+            }),
+          });
+        })
+        .catch(console.error);
+    }
+
     return NextResponse.json(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update shipment";

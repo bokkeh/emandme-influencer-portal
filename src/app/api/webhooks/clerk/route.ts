@@ -4,6 +4,8 @@ import { WebhookEvent } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users, influencerProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { sendEmail } from "@/lib/email";
+import { welcomeEmailHtml } from "@/lib/email/templates";
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -65,6 +67,13 @@ export async function POST(req: Request) {
         .insert(influencerProfiles)
         .values({ userId: user.id })
         .onConflictDoNothing();
+
+      // Send welcome email (fire-and-forget)
+      sendEmail({
+        to: email,
+        subject: "Welcome to Em & Me Studio",
+        html: welcomeEmailHtml(first_name ?? null),
+      }).catch(console.error);
     }
   }
 
