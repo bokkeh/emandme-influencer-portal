@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (event.type === "transfer.failed") {
+  if ((event.type as string) === "transfer.failed") {
     const transfer = event.data.object as TransferWithFailure;
     const paymentId = transfer.metadata?.paymentId;
 
@@ -131,7 +131,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (event.type === "transfer.reversed") {
+  if ((event.type as string) === "transfer.reversed") {
     const transfer = event.data.object as Stripe.Transfer;
     const paymentId = transfer.metadata?.paymentId;
 
