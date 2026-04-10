@@ -56,7 +56,7 @@ export function welcomeEmailHtml(firstName: string | null): string {
     </p>
     ${btn(`${APP_URL}/influencer/profile`, "Complete Your Profile")}
     <p style="margin:24px 0 0;font-size:14px;color:#6b7280;line-height:1.6;">
-      If you have any questions, just reply to this email — we're here to help.
+      If you have any questions, just reply to this email - we're here to help.
     </p>
   `);
 }
@@ -95,7 +95,7 @@ export function shipmentShippedEmailHtml(options: {
     <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827;">Your package is on its way</h2>
     <p style="margin:0 0 12px;font-size:15px;color:#374151;line-height:1.6;">Hi ${name},</p>
     <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
-      Great news — we've shipped your Em &amp; Me Studio products!
+      Great news - we've shipped your Em &amp; Me Studio products!
     </p>
     <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin:0 0 24px;">
       <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Items Shipped</p>
@@ -135,7 +135,7 @@ export function paymentSentEmailHtml(options: {
       ${options.description ? `<p style="margin:8px 0 0;font-size:13px;color:#4b7c60;">${options.description}</p>` : ""}
     </div>
     <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6;">
-      Funds typically arrive within 1–3 business days depending on your bank.
+      Funds typically arrive within 1-3 business days depending on your bank.
     </p>
     ${btn(`${APP_URL}/influencer/payments`, "View Payments")}
   `);
@@ -174,3 +174,4 @@ export function paymentFailedEmailHtml(options: {
     ${btn(`${APP_URL}/influencer/profile`, "Review Payment Details")}
   `);
 }
+

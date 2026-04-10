@@ -88,7 +88,7 @@ export default function SettingsPage() {
             Stripe webhook URL: <code className="bg-gray-100 px-1 rounded text-xs">{process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/stripe</code>
           </p>
           <p className="text-sm text-gray-500">
-            Required events: <code className="bg-gray-100 px-1 rounded text-xs">account.updated</code>, <code className="bg-gray-100 px-1 rounded text-xs">transfer.failed</code>
+            Required events: <code className="bg-gray-100 px-1 rounded text-xs">account.updated</code>, <code className="bg-gray-100 px-1 rounded text-xs">transfer.created</code>, <code className="bg-gray-100 px-1 rounded text-xs">transfer.failed</code>, <code className="bg-gray-100 px-1 rounded text-xs">transfer.reversed</code>
           </p>
         </CardContent>
       </Card>

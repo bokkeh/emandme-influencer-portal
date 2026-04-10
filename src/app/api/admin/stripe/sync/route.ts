@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
   try {
     const status = await getStripeAccountStatus(profile.stripeAccountId);
-    const stripeAccountStatus = status.payoutsEnabled ? "active" : status.detailsSubmitted ? "pending" : "not_connected";
+    const stripeAccountStatus = status.stripeAccountStatus;
 
     await db
       .update(influencerProfiles)
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       stripeAccountStatus,
-      stripePayoutsEnabled: status.payoutsEnabled,
+      stripePayoutsEnabled: status.payoutsEnabled ?? false,
       stripeDetailsSubmitted: status.detailsSubmitted,
     });
   } catch (error) {

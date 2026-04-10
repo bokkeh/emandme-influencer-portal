@@ -20,9 +20,9 @@ export function SyncStripeButton({ influencerProfileId }: { influencerProfileId:
       if (!res.ok) throw new Error(await res.text());
       const data = (await res.json()) as { stripePayoutsEnabled: boolean; stripeAccountStatus: string };
       if (data.stripePayoutsEnabled) {
-        toast.success("Stripe synced — payouts are now enabled.");
+        toast.success("Stripe synced - payouts are now enabled.");
       } else {
-        toast.info(`Stripe synced — status: ${data.stripeAccountStatus.replace("_", " ")}.`);
+        toast.info(`Stripe synced - status: ${data.stripeAccountStatus.replace("_", " ")}.`);
       }
       router.refresh();
     } catch (error) {
