@@ -148,7 +148,10 @@ export default async function PaymentsPage() {
                       <TableCell>
                         {p.status === "pending" ? (
                           p.stripePayoutsEnabled ? (
-                            <TriggerPayoutButton paymentId={p.id} />
+                            <div className="flex items-center gap-1">
+                              <TriggerPayoutButton paymentId={p.id} />
+                              <SyncStripeButton influencerProfileId={p.influencerProfileId} />
+                            </div>
                           ) : (
                             <div className="flex items-center gap-1">
                               <button
