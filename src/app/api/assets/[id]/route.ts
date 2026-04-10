@@ -60,11 +60,6 @@ export async function PATCH(
 
   let emailSent = false;
   let emailError: string | null = null;
-  let emailDebug: {
-    recipientEmail?: string;
-    contactId?: string;
-    properties?: Record<string, string>;
-  } | null = null;
   try {
     const emailResult = await sendAssetReviewEmailViaHubSpot({
       influencerProfileId: existing.influencerProfileId,
@@ -74,16 +69,13 @@ export async function PATCH(
       reviewNotes: body.reviewNotes ?? null,
     });
     emailSent = emailResult.sent;
-    emailDebug = emailResult.sent ? emailResult.debug : null;
     if (!emailResult.sent) {
       emailError = "HubSpot workflow trigger skipped (missing influencer email).";
     }
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : "Unknown HubSpot email error";
     if (rawMessage.includes("requiredGranularScopes") && rawMessage.includes("transactional-email")) {
-      // Backward compatibility: ignore legacy transactional-email scope errors.
       emailSent = true;
-      emailError = null;
       console.warn("[HubSpot] Ignoring legacy transactional-email scope error.");
     } else {
       emailError = rawMessage;
@@ -91,7 +83,7 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ ...updated, emailSent, emailError, emailDebug });
+  return NextResponse.json({ ...updated, emailSent, emailError });
 }
 
 export async function DELETE(

@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { KPICard } from "@/components/admin/KPICard";
 import { CreatePaymentDialog } from "@/components/admin/CreatePaymentDialog";
 import { TriggerPayoutButton } from "@/components/admin/TriggerPayoutButton";
+import { SyncStripeButton } from "@/components/admin/SyncStripeButton";
 import { CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -36,6 +37,7 @@ export default async function PaymentsPage() {
         userFirstName: users.firstName,
         userLastName: users.lastName,
         stripePayoutsEnabled: influencerProfiles.stripePayoutsEnabled,
+        influencerProfileId: influencerProfiles.id,
       })
       .from(payments)
       .innerJoin(influencerProfiles, eq(payments.influencerProfileId, influencerProfiles.id))
@@ -148,14 +150,17 @@ export default async function PaymentsPage() {
                           p.stripePayoutsEnabled ? (
                             <TriggerPayoutButton paymentId={p.id} />
                           ) : (
-                            <button
-                              type="button"
-                              disabled
-                              title="Influencer must connect Stripe and enable payouts first."
-                              className="h-8 rounded-md border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500"
-                            >
-                              Pay Now (Connect Required)
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled
+                                title="Influencer must connect Stripe and enable payouts first."
+                                className="h-8 rounded-md border border-gray-200 bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500"
+                              >
+                                Pay Now (Connect Required)
+                              </button>
+                              <SyncStripeButton influencerProfileId={p.influencerProfileId} />
+                            </div>
                           )
                         ) : null}
                         {p.stripeTransferId ? (
